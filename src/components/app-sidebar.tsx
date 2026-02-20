@@ -5,15 +5,18 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarTrigger,
+  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
-  FileText, MessageCircleWarning, Monitor, MapPin, Image
+  FileText, MessageCircleWarning, Monitor, MapPin, Image, LogOut
 } from "lucide-react";
 import type { Route } from "./nav-main";
 import DashboardNavigation from "./nav-main";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 const dashboardRoutes: Route[] = [
   {
@@ -27,9 +30,24 @@ const dashboardRoutes: Route[] = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const router = useRouter();
+
+  function handleLogout() {
+    // Clear localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('tokenExpiry');
+
+    // Redirect to login
+    router.push('/login');
+  }
 
   return (
-    <Sidebar variant="floating" collapsible="icon">
+    <Sidebar
+      variant="floating"
+      collapsible="icon"
+      className="[&_div[data-sidebar='sidebar']]:bg-white/85 [&_div[data-sidebar='sidebar']]:backdrop-blur-xl [&_div[data-sidebar='sidebar']]:border-white/20 [&_div[data-sidebar='sidebar']]:shadow-xl [&_div[data-sidebar='sidebar']]:shadow-black/5 dark:[&_div[data-sidebar='sidebar']]:bg-gray-900/85 dark:[&_div[data-sidebar='sidebar']]:border-white/10"
+    >
       <SidebarHeader
         className={cn(
           "flex md:pt-3.5",
@@ -62,6 +80,19 @@ export function AppSidebar() {
       <SidebarContent className="gap-4 px-2 py-4">
         <DashboardNavigation routes={dashboardRoutes} />
       </SidebarContent>
+      <SidebarFooter className="p-2 border-t border-white/10">
+        <Button
+          variant="ghost"
+          className={cn(
+            "w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted",
+            isCollapsed && "justify-center px-2"
+          )}
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          {!isCollapsed && <span className="ml-2">Logout</span>}
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }

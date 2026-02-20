@@ -1,10 +1,6 @@
-import Image from "next/image";
-import InvoicePage from "./report/page";
+import { redirect } from 'next/navigation'
 
 export default function Home() {
-  return (
-   <div>
-    <InvoicePage/>
-   </div>
-  );
+  // Redirect to report page
+  redirect('/report')
 }

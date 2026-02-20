@@ -11,6 +11,9 @@ export type Row = {
   id: number
   created_at: Date
   data: Record<string, any>
+  notification_status?: 'not_yet' | 'success' | 'failed'
+  notification_sent_at?: Date | null
+  notification_error?: string | null
 }
 
 export function useInvoiceData() {

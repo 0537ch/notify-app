@@ -1,55 +1,143 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import type { ColumnDef } from '@tanstack/react-table'
-import { flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, PaginationState } from '@tanstack/react-table'
+import { useMemo, useState, useEffect } from 'react'
+import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
+import { flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, getExpandedRowModel, PaginationState } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { useInvoiceData, useRowSelection, useNotifications, downloadTemplate, type Row } from '../_hooks/use-report'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxInput,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from '@/components/ui/combobox'
+import { FileText, Calendar, Upload, Trash2, Send, FileSpreadsheet, Inbox, ChevronDownIcon, ChevronUpIcon, Columns3, Search, RefreshCcw } from 'lucide-react'
+import { EmailTemplateModal } from './EmailTemplateModal'
+import { Fragment } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { useInvoiceData, downloadTemplate, type Row } from '../_hooks/use-report'
+import { useEmailTemplate } from '../_hooks/use-email-template'
 
 export default function InvoiceTable() {
   const invoiceData = useInvoiceData()
-  const selection = useRowSelection(invoiceData.people)
-  const notifications = useNotifications(selection.selectedPeople, selection.setRowSelection)
 
   const { people, imports, selectedImportId, setSelectedImportId, loading, error, uploading, selectedFile, setSelectedFile, fileInputRef, handleFileUpload, handleImport, handleDeleteImport } = invoiceData
-  const { rowSelection, setRowSelection, selectedPeople } = selection
-  const { notificationDialogOpen, setNotificationDialogOpen, sending, handleSendNotifications } = notifications
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10
   })
-
-  const flattenedData = useMemo(() => {
-    return people.map(person => ({
-      ...person,
-      ...person.data
-    }))
-  }, [people])
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [columnSearchQuery, setColumnSearchQuery] = useState<string>('')
 
   const columnKeys = useMemo(() => {
-    if (flattenedData.length === 0) return []
-    const keys = new Set<string>()
-    flattenedData.forEach(person => {
-      Object.keys(person).forEach(key => {
-        if (key !== 'id' && key !== 'created_at' && key !== 'data') {
-          keys.add(key)
-        }
-      })
+    if (people.length === 0) return []
+    const firstPersonData = people[0]?.data || {}
+    return Object.keys(firstPersonData)
+  }, [people])
+
+  // Set default column visibility: only first 5 CSV columns visible
+  const defaultColumnVisibility = useMemo(() => {
+    const visibility: VisibilityState = {}
+    columnKeys.forEach((key, index) => {
+      if (index >= 5) {
+        visibility[key] = false
+      }
     })
-    return Array.from(keys)
-  }, [flattenedData])
+    return visibility
+  }, [columnKeys])
+
+  // Apply default column visibility when columnKeys change
+  useEffect(() => {
+    if (columnKeys.length > 0) {
+      setColumnVisibility(defaultColumnVisibility)
+    }
+  }, [defaultColumnVisibility, columnKeys.length])
+
+  const flattenedData = useMemo(() => {
+    const flat = people.map(person => ({
+      id: person.id,
+      created_at: person.created_at,
+      notification_status: person.notification_status,
+      notification_sent_at: person.notification_sent_at,
+      notification_error: person.notification_error,
+      ...person.data
+    })) as Array<{ id: number; created_at: Date; notification_status?: string; notification_sent_at?: Date; notification_error?: string; [key: string]: any }>
+
+    // Auto-detect email column
+    const emailColumn = columnKeys.find(key =>
+      flat.some(row => {
+        const val = row[key]
+        return typeof val === 'string' && val.includes('@')
+      })
+    )
+
+    if (!emailColumn) return flat
+
+    const groups = new Map<string, any>()
+    flat.forEach(row => {
+      const email = row[emailColumn] as string
+      if (!groups.has(email)) {
+        groups.set(email, { ...row, _childRows: [] })
+      }
+      groups.get(email)!._childRows.push(row)
+    })
+
+    return Array.from(groups.values())
+  }, [people, columnKeys])
+
+  const selectedFlattenedData = useMemo(() => {
+    const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key])
+    return selectedIndices.map(idx => flattenedData[parseInt(idx)])
+  }, [rowSelection, flattenedData])
+
+  const emailTemplate = useEmailTemplate(selectedFlattenedData, columnKeys)
+  const { templateModalOpen, setTemplateModalOpen, sending: sendingEmails, sendEmails } = emailTemplate
+
+  const sampleData = useMemo(() => {
+    const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key])
+
+    if (selectedIndices.length === 0) return {}
+
+    const firstSelectedIndex = parseInt(selectedIndices[0])
+    const firstSelectedRow = flattenedData[firstSelectedIndex]
+
+    if (!firstSelectedRow) return {}
+
+    const { _childRows, id, created_at, ...rowData } = firstSelectedRow
+    return rowData
+  }, [rowSelection, flattenedData])
+
+  const sampleRows = useMemo(() => {
+    const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key])
+
+    if (selectedIndices.length === 0) return []
+
+    const firstSelectedIndex = parseInt(selectedIndices[0])
+    const firstSelectedRow = flattenedData[firstSelectedIndex]
+
+    if (!firstSelectedRow || !firstSelectedRow._childRows) return []
+
+    return firstSelectedRow._childRows
+  }, [rowSelection, flattenedData])
 
   const columns = useMemo<ColumnDef<typeof flattenedData[number]>[]>(() => {
     const cols: ColumnDef<Row>[] = [
       {
         id: 'select',
         size: 50,
+        enableHiding: false,
         header: ({ table }) => (
           <Checkbox
             checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate')}
@@ -64,6 +152,64 @@ export default function InvoiceTable() {
             aria-label='Select row'
           />
         )
+      },
+      {
+        id: 'expand',
+        size: 100,
+        enableHiding: false,
+        header: 'Rows',
+        cell: ({ row }) => {
+          const childRows = (row.original as any)._childRows || []
+          const count = childRows.length
+          return (
+            <div className='flex items-center gap-2'>
+              <Badge variant='secondary'>
+                {count} {count === 1 ? 'row' : 'rows'}
+              </Badge>
+              {count > 0 && row.getCanExpand() && (
+                <Button
+                  className='size-7 text-muted-foreground'
+                  onClick={row.getToggleExpandedHandler()}
+                  aria-expanded={row.getIsExpanded()}
+                  aria-label={row.getIsExpanded() ? 'Collapse' : 'Expand'}
+                  size='icon'
+                  variant='ghost'
+                >
+                  {row.getIsExpanded() ? (
+                    <ChevronUpIcon className='opacity-60' aria-hidden='true' />
+                  ) : (
+                    <ChevronDownIcon className='opacity-60' aria-hidden='true' />
+                  )}
+                </Button>
+              )}
+            </div>
+          )
+        }
+      },
+      {
+        id: 'notification_status',
+        size: 120,
+        enableHiding: false,
+        header: 'Status',
+        cell: ({ row }) => {
+          const childRows = (row.original as any)._childRows || []
+          const firstChild = childRows[0] || row.original
+          const status = firstChild.notification_status || 'not_yet'
+
+          const statusConfig = {
+            not_yet: { label: 'Not Yet', variant: 'secondary' as const, className: '' },
+            success: { label: 'Success', variant: 'default' as const, className: 'bg-green-500 hover:bg-green-600 text-white' },
+            failed: { label: 'Failed', variant: 'destructive' as const, className: '' }
+          }
+
+          const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.not_yet
+
+          return (
+            <Badge variant={config.variant} className={config.className}>
+              {config.label}
+            </Badge>
+          )
+        }
       }
     ]
 
@@ -87,18 +233,73 @@ export default function InvoiceTable() {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: (row) => {
+      const childRows = (row.original as any)._childRows || []
+      return childRows.length > 0
+    },
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
+    onColumnVisibilityChange: setColumnVisibility,
     state: {
       rowSelection,
-      pagination
+      pagination,
+      columnVisibility
     }
   })
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center p-12">
-        <div className="text-gray-600">Loading...</div>
+      <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className='overflow-x-auto border-t'>
+          <Table>
+            <TableHeader>
+              <TableRow className='hover:bg-transparent'>
+                <TableHead><Skeleton className="h-4 w-4" /></TableHead>
+                <TableHead><Skeleton className="h-4 w-24" /></TableHead>
+                <TableHead><Skeleton className="h-4 w-32" /></TableHead>
+                <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+                <TableHead><Skeleton className="h-4 w-28" /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...Array(5)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="border-t px-6 py-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-48" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8" />
+              <Skeleton className="h-8 w-8" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-8 w-8" />
+              <Skeleton className="h-8 w-8" />
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -112,80 +313,130 @@ export default function InvoiceTable() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* pilih file */}
-      {imports.length > 0 && (
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium whitespace-nowrap">Select File:</label>
-          <select
-            value={selectedImportId ?? ''}
-            onChange={(e) => setSelectedImportId(e.target.value ? parseInt(e.target.value) : null)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 max-w-sm"
-          >
-            {imports.map((imp) => (
-              <option key={imp.id} value={imp.id}>
-                {imp.file_name} ({new Date(imp.uploaded_at).toLocaleDateString()})
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            ({people.length} rows)
-          </span>
-        </div>
-      )}
-
-      {/* tombol upload */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        {/* Left side - Send Notification button */}
-        <Dialog open={notificationDialogOpen} onOpenChange={setNotificationDialogOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={selectedPeople.length === 0} className="w-full sm:w-auto">
-              Kirim {selectedPeople.length > 0 && `(${selectedPeople.length})`}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Send Notifications</DialogTitle>
-              <DialogDescription>
-                Kirim Notifikasi ke {selectedPeople.length} {selectedPeople.length === 1 ? 'orang' : 'orang'}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-4 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {columnKeys.map(key => (
-                      <TableHead key={key}>{key}</TableHead>
+    <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10">
+      <div className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            {imports.length > 0 && (
+              <Combobox
+                value={selectedImportId?.toString() ?? ''}
+                onValueChange={(value) => setSelectedImportId(value ? parseInt(value) : null)}
+              >
+                <ComboboxInput
+                  placeholder="Select an import..."
+                  showTrigger
+                  className="w-full sm:w-80"
+                  value={imports.find(imp => imp.id === selectedImportId)?.file_name ?? ''}
+                  readOnly
+                />
+                <ComboboxContent>
+                  <ComboboxList>
+                    {imports.map((imp) => (
+                      <ComboboxItem key={imp.id} value={imp.id.toString()}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                            <FileText className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                            <span className="font-medium text-sm truncate">{imp.file_name}</span>
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{new Date(imp.uploaded_at).toLocaleDateString()}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </ComboboxItem>
                     ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedPeople.map((person) => (
-                    <TableRow key={person.id}>
-                      {columnKeys.map(key => (
-                        <TableCell key={key}>
-                          {person.data[key]?.toString() ?? ''}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                    <ComboboxEmpty>No imports found</ComboboxEmpty>
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {columnKeys.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Columns3 className="h-4 w-4" />
+                    Kolom
+                    <ChevronDownIcon className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={columnSearchQuery}
+                      onChange={(e) => setColumnSearchQuery(e.target.value)}
+                      className="pl-8 h-9"
+                      placeholder="Cari kolom..."
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <DropdownMenuSeparator />
+                  {table
+                    .getAllColumns()
+                    .filter((column) => column.getCanHide())
+                    .filter((column) => {
+                      if (columnSearchQuery && !column.id.toLowerCase().includes(columnSearchQuery.toLowerCase())) {
+                        return false
+                      }
+                      return true
+                    })
+                    .map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      table.resetColumnVisibility(false)
+                      // Apply default visibility (first 5 columns)
+                      Object.entries(defaultColumnVisibility).forEach(([key, value]) => {
+                        table.getColumn(key)?.toggleVisibility(value)
+                      })
+                      setColumnSearchQuery('')
+                    }}
+                  >
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Reset ke Default
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>{people.length} rows</span>
             </div>
+          </div>
+        </div>
 
-            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
-              <Button variant="outline" onClick={() => setNotificationDialogOpen(false)} className="w-full sm:w-auto">
-                Cancel
-              </Button>
-              <Button onClick={handleSendNotifications} disabled={sending} className="w-full sm:w-auto">
-                {sending ? 'Sending...' : 'Send Notifications'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            onClick={() => setTemplateModalOpen(true)}
+            disabled={Object.keys(rowSelection).filter(key => rowSelection[key]).length === 0}
+          >
+            <Send className="mr-2 h-4 w-4" />
+            Send Email
+          </Button>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <EmailTemplateModal
+            open={templateModalOpen}
+            onOpenChange={setTemplateModalOpen}
+            variables={columnKeys}
+            sampleData={sampleData}
+            sampleRows={sampleRows}
+            onSend={sendEmails}
+            sending={sendingEmails}
+          />
+
           <input
             ref={fileInputRef}
             type="file"
@@ -196,13 +447,15 @@ export default function InvoiceTable() {
           />
 
           {!selectedFile ? (
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex-1 sm:flex-none">
+            <>
+              <Button onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                <Upload className="mr-2 h-4 w-4" />
                 Upload File
               </Button>
               <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="destructive" disabled={!selectedImportId} className="flex-1 sm:flex-none">
+                  <Button variant="destructive" disabled={!selectedImportId}>
+                    <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </Button>
                 </DialogTrigger>
@@ -230,41 +483,47 @@ export default function InvoiceTable() {
                       disabled={deleting}
                       className="w-full sm:w-auto"
                     >
+                      {deleting && <Spinner className="mr-2" />}
                       {deleting ? 'Deleting...' : 'Delete'}
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
-            </div>
+            </>
           ) : (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
-              <div className="text-sm text-muted-foreground truncate px-2 py-1 bg-muted rounded flex-1 sm:flex-none sm:max-w-48">
+            <>
+              <div className="text-sm text-muted-foreground truncate px-3 py-2 bg-muted rounded">
                 {selectedFile.name}
               </div>
-              <Button onClick={handleImport} disabled={uploading} className="flex-1 sm:flex-none">
+              <Button onClick={handleImport} disabled={uploading}>
+                {uploading && <Spinner className="mr-2" />}
                 {uploading ? 'Importing...' : 'Import'}
               </Button>
-              <Button variant="outline" onClick={() => setSelectedFile(null)} disabled={uploading} className="flex-1 sm:flex-none">
+              <Button variant="outline" onClick={() => setSelectedFile(null)} disabled={uploading}>
                 Cancel
               </Button>
-            </div>
+            </>
           )}
         </div>
       </div>
 
       {people.length === 0 ? (
-        <div className="text-center p-12 text-gray-500">
-          No data yet. Import a CSV or XLSX file to get started.
+        <div className="p-12 text-center">
+          <Inbox className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No data yet</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            Import a CSV or XLSX file.
+          </p>
         </div>
       ) : (
         <>
-          <div className='rounded-md border overflow-x-auto'>
-            <Table className='min-w-150'>
+          <div className='overflow-x-auto border-t'>
+            <Table>
               <TableHeader>
                 {table.getHeaderGroups().map(headerGroup => (
-                  <TableRow key={headerGroup.id} className='hover:bg-transparent'>
+                  <TableRow key={headerGroup.id} className='hover:bg-transparent bg-muted/50 border-b-2'>
                     {headerGroup.headers.map(header => (
-                      <TableHead key={header.id}>
+                      <TableHead key={header.id} className='font-semibold'>
                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}
@@ -274,13 +533,49 @@ export default function InvoiceTable() {
               <TableBody>
                 {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map(row => (
-                    <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
-                      {row.getVisibleCells().map(cell => (
-                        <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
+                    <Fragment key={row.id}>
+                      <TableRow data-state={row.getIsSelected() && 'selected'}>
+                        {row.getVisibleCells().map(cell => (
+                          <TableCell
+                            key={cell.id}
+                            className='[&:has([aria-expanded])]:[&:has([aria-expanded])]:w-px [&:has([aria-expanded])]:[&:has([aria-expanded])]:py-0'
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                      {row.getIsExpanded() && (
+                        <TableRow className='hover:bg-transparent animate-in fade-in slide-in-from-top-2 duration-300'>
+                          <TableCell></TableCell>
+                          <TableCell colSpan={columnKeys.length + 1} className='p-4'>
+                            <div className='rounded-lg border overflow-hidden'>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className='bg-muted/50 border-b-2'>
+                                    {columnKeys.map(key => (
+                                      <TableHead key={key} className='text-xs font-semibold text-muted-foreground'>
+                                        {key}
+                                      </TableHead>
+                                    ))}
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
+                                    <TableRow key={idx} className='hover:bg-muted/30'>
+                                      {columnKeys.map(key => (
+                                        <TableCell key={key} className='text-sm'>
+                                          {childRow[key] ?? ''}
+                                        </TableCell>
+                                      ))}
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   ))
                 ) : (
                   <TableRow>
@@ -293,53 +588,54 @@ export default function InvoiceTable() {
             </Table>
           </div>
 
-          {/* Pagination Controls */}
-          <div className="flex items-center justify-between px-2">
-            <div className="text-sm text-muted-foreground">
-              Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
-              {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of{' '}
-              {table.getFilteredRowModel().rows.length} row(s)
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                {'<<'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                {'<'}
-              </Button>
-              <div className="text-sm">
-                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          <div className="border-t px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+                {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of{' '}
+                {table.getFilteredRowModel().rows.length} row(s)
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                {'>'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                {'>>'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  {'<<'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  {'<'}
+                </Button>
+                <div className="text-sm">
+                  Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  {'>'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                >
+                  {'>>'}
+                </Button>
+              </div>
             </div>
           </div>
         </>
       )}
-      </div>
+    </div>
   )
 }

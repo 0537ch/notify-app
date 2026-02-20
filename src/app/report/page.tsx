@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { AppSidebar } from '@/components/app-sidebar'
 import InvoiceTable from '@/app/report/_components/InvoiceTable'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
+import { AuthProvider } from '@/components/auth-provider'
 
 export default function InvoicePage() {
   const [totalCount, setTotalCount] = useState<number>(0)
@@ -27,11 +27,18 @@ export default function InvoicePage() {
   }, [])
 
   return (
-    <SidebarProvider>
+    <AuthProvider>
+      <SidebarProvider>
+      {/* Gradient Background - needs to be outside SidebarInset */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-950 dark:to-gray-900">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-400/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-400/15 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-400/10 rounded-full blur-3xl" />
+      </div>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="bg-transparent">
         {/* Mobile Header */}
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:hidden bg-background sticky top-0 z-10">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-white/20 px-4 md:hidden bg-white/80 backdrop-blur-md sticky top-0 z-10 dark:bg-gray-900/80 dark:border-white/10">
           <SidebarTrigger className="-ml-1" />
           <div className="flex-1">
             <h1 className="font-semibold">Report</h1>
@@ -39,11 +46,11 @@ export default function InvoicePage() {
         </header>
 
         {/* Desktop Header */}
-        <header className="hidden md:flex h-13 shrink-0 items-center gap-2 border-b px-2 bg-background sticky top-0 z-10">
+        <header className="w-full hidden md:flex h-13 shrink-0 items-center gap-2 border-b border-white/20 px-2 -ml-2 bg-white/80 backdrop-blur-md sticky top-0 z-10 dark:bg-gray-900/80 dark:border-white/10">
         </header>
 
         {/* Main Content Area */}
-        <div className="flex flex-1 flex-col gap-4 p-4 sm:p-8 pt-6">
+        <div className="flex flex-1 flex-col gap-4 sm:p-8 pt-6 relative">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
@@ -56,13 +63,13 @@ export default function InvoicePage() {
               placeholder='Search'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className='mt-3 max-w-sm'/>
+              className='mt-3 max-w-sm bg-white/80 backdrop-blur-sm border-white/30 focus:bg-white/90 dark:bg-gray-900/80 dark:border-white/10 dark:focus:bg-gray-900/90'/>
             </div>
           </div>
-          <Separator className="my-2" />
           <InvoiceTable />
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </AuthProvider>
   )
 }

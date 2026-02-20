@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     }
 
     const rows = await sql`
-      SELECT id, data, created_at
+      SELECT id, data, created_at, notification_status, notification_sent_at, notification_error
       FROM rows
       WHERE import_id = ${selectedImportId}
       ORDER BY created_at
