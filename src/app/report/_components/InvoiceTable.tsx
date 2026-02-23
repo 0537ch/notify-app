@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
-import { flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, getExpandedRowModel, PaginationState } from '@tanstack/react-table'
+import type { ColumnDef, VisibilityState, SortingState } from '@tanstack/react-table'
+import { flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, getExpandedRowModel, getSortedRowModel, PaginationState } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -35,6 +35,7 @@ export default function InvoiceTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+  const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10
@@ -184,7 +185,7 @@ export default function InvoiceTable() {
         enableHiding: false,
         header: ({ table }) => (
           <Checkbox
-            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate')}
+            checked={table.getIsAllPageRowsSelected()}
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label='Select all'
           />
@@ -278,15 +279,18 @@ export default function InvoiceTable() {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: (row) => {
       const childRows = (row.original as any)._childRows || []
       return childRows.length > 0
     },
+    onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
     onColumnVisibilityChange: setColumnVisibility,
     state: {
+      sorting,
       rowSelection,
       pagination,
       columnVisibility
@@ -364,8 +368,8 @@ export default function InvoiceTable() {
   }
 
   return (
-    <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10 overflow-hidden">
-      <div className="p-6 space-y-4">
+    <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10 flex flex-col max-h-[calc(100vh-8rem)]">
+      <div className="p-6 space-y-4 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             {imports.length > 0 && (
@@ -589,7 +593,7 @@ export default function InvoiceTable() {
       </div>
 
       {people.length === 0 ? (
-        <div className="p-12 text-center">
+        <div className="p-12 text-center flex-1">
           <Inbox className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
           <h3 className="text-lg font-semibold mb-2">No data yet</h3>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
@@ -598,87 +602,133 @@ export default function InvoiceTable() {
         </div>
       ) : (
         <>
-          <div className='overflow-x-auto border-t'>
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map(headerGroup => (
-                  <TableRow key={headerGroup.id} className='hover:bg-transparent bg-slate-100 border-b-2 border-slate-300'>
-                    {headerGroup.headers.map(header => (
-                      <TableHead key={header.id} className='font-semibold text-foreground'>
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map(row => (
-                    <Fragment key={row.id}>
-                      <TableRow data-state={row.getIsSelected() && 'selected'} className='bg-white hover:bg-white'>
-                        {row.getVisibleCells().map(cell => (
-                          <TableCell
-                            key={cell.id}
-                            className='[&:has([aria-expanded])]:[&:has([aria-expanded])]:w-px [&:has([aria-expanded])]:[&:has([aria-expanded])]:py-0'
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                      {row.getIsExpanded() && (
-                        <TableRow className='hover:bg-transparent animate-in fade-in slide-in-from-top-2 duration-300'>
-                          <TableCell></TableCell>
-                          <TableCell colSpan={columnKeys.length + 1} className='p-4' style={{ width: '1px', minWidth: '0' }}>
-                            <div className='rounded-lg border overflow-hidden' style={{ width: '100%', overflow: 'hidden' }}>
-                              <div className='overflow-x-auto'>
-                                <Table style={{ minWidth: 'max-content' }}>
-                                  <TableHeader>
-                                    <TableRow className='bg-slate-100 border-b-2 border-slate-300'>
-                                      {columnKeys.map(key => (
-                                        <TableHead key={key} className='text-xs font-semibold text-foreground whitespace-nowrap'>
-                                          {key}
-                                        </TableHead>
-                                      ))}
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
-                                      <TableRow key={idx} className='bg-white hover:bg-slate-50'>
+          <div className='overflow-auto border-t flex-1 min-h-0'>
+            <div className="min-w-full inline-block align-middle">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map(headerGroup => (
+                    <TableRow key={headerGroup.id} className='sticky top-0 z-10 hover:bg-transparent bg-slate-100/95 backdrop-blur-sm border-b-2 border-slate-300 shadow-sm'>
+                      {headerGroup.headers.map(header => (
+                        <TableHead
+                          key={header.id}
+                          className='font-semibold text-foreground'
+                          aria-sort={
+                            header.column.getIsSorted() === 'asc'
+                              ? 'ascending'
+                              : header.column.getIsSorted() === 'desc'
+                                ? 'descending'
+                                : 'none'
+                          }
+                        >
+                          {header.isPlaceholder ? null : (
+                            <div
+                              className={`flex h-full ${header.column.getCanSort() ? 'cursor-pointer items-center justify-between gap-2 select-none' : 'items-center'}`}
+                              onClick={header.column.getToggleSortingHandler()}
+                              onKeyDown={e => {
+                                if (header.column.getCanSort() && (e.key === 'Enter' || e.key === ' ')) {
+                                  e.preventDefault()
+                                  header.column.getToggleSortingHandler()?.(e)
+                                }
+                              }}
+                              tabIndex={header.column.getCanSort() ? 0 : undefined}
+                            >
+                              <span className='truncate'>
+                                {flexRender(header.column.columnDef.header, header.getContext())}
+                              </span>
+                              {(header.column.getIsSorted() === 'asc' && <ChevronUpIcon className='shrink-0 opacity-60' size={16} aria-hidden='true' />) ||
+                              (header.column.getIsSorted() === 'desc' && <ChevronDownIcon className='shrink-0 opacity-60' size={16} aria-hidden='true' />)}
+                            </div>
+                          )}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map(row => (
+                      <Fragment key={row.id}>
+                        <TableRow data-state={row.getIsSelected() && 'selected'} className='bg-white hover:bg-white'>
+                          {row.getVisibleCells().map(cell => (
+                            <TableCell
+                              key={cell.id}
+                              className='[&:has([aria-expanded])]:[&:has([aria-expanded])]:w-px [&:has([aria-expanded])]:[&:has([aria-expanded])]:py-0'
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                        {row.getIsExpanded() && (
+                          <TableRow className='hover:bg-transparent animate-in fade-in slide-in-from-top-2 duration-300'>
+                            <TableCell></TableCell>
+                            <TableCell colSpan={columnKeys.length + 1} className='p-4' style={{ width: '1px', minWidth: '0' }}>
+                              <div className='rounded-lg border overflow-hidden' style={{ width: '100%', overflow: 'hidden' }}>
+                                <div className='overflow-x-auto'>
+                                  <Table style={{ minWidth: 'max-content' }}>
+                                    <TableHeader>
+                                      <TableRow className='bg-slate-100 border-b-2 border-slate-300'>
                                         {columnKeys.map(key => (
-                                          <TableCell key={key} className='text-sm whitespace-nowrap'>
-                                            {childRow[key] ?? ''}
-                                          </TableCell>
+                                          <TableHead key={key} className='text-xs font-semibold text-foreground whitespace-nowrap'>
+                                            {key}
+                                          </TableHead>
                                         ))}
                                       </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
+                                        <TableRow key={idx} className='bg-white hover:bg-slate-50'>
+                                          {columnKeys.map(key => (
+                                            <TableCell key={key} className='text-sm whitespace-nowrap'>
+                                              {childRow[key] ?? ''}
+                                            </TableCell>
+                                          ))}
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className='h-24 text-center'>
-                      No results.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={columns.length} className='h-24 text-center'>
+                        No results.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
-          <div className="border-t px-6 py-4">
-            <div className="flex items-center justify-between">
+          <div className="border-t px-6 py-4 shrink-0">
+            <div className="flex items-center justify-between gap-4">
               <div className="text-sm text-muted-foreground">
                 Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
                 {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of{' '}
                 {table.getFilteredRowModel().rows.length} row(s)
               </div>
               <div className="flex items-center gap-2">
+                <select
+                  value={table.getState().pagination.pageSize}
+                  onChange={e => {
+                    table.setPageSize(Number(e.target.value))
+                  }}
+                  className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  {[10, 20, 50, 100].map(pageSize => (
+                    <option key={pageSize} value={pageSize}>
+                      {pageSize}
+                    </option>
+                  ))}
+                  <option value={table.getFilteredRowModel().rows.length}>
+                    All
+                  </option>
+                </select>
                 <Button
                   variant="outline"
                   size="sm"
@@ -718,7 +768,7 @@ export default function InvoiceTable() {
             </div>
           </div>
         </>
-      )}
+        )}
     </div>
   )
 }
