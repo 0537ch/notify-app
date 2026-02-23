@@ -3,7 +3,6 @@ import { cookies } from 'next/headers'
 
 export async function authMiddleware(request: NextRequest) {
   try {
-    // Get token from Authorization header
     const authHeader = request.headers.get('authorization')
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -13,9 +12,8 @@ export async function authMiddleware(request: NextRequest) {
       )
     }
 
-    const token = authHeader.substring(7) // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7) 
 
-    // Verify token by calling auth endpoint
     const tokenEndpoint = process.env.TOKEN_ENDPOINT
 
     if (!tokenEndpoint) {
@@ -25,7 +23,6 @@ export async function authMiddleware(request: NextRequest) {
       )
     }
 
-    // Verify token with auth server
     const verifyResponse = await fetch(tokenEndpoint, {
       method: 'POST',
       headers: {
@@ -41,7 +38,6 @@ export async function authMiddleware(request: NextRequest) {
       )
     }
 
-    // Token is valid, attach to request for downstream use
     return { token, valid: true }
   } catch (error) {
     console.error('❌ Auth middleware error:', error)

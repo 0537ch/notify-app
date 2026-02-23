@@ -15,7 +15,6 @@ export function formatCurrency(value: number | string): string {
     return '0'
   }
 
-  // Gunakan Intl.NumberFormat - lebih simple dan powerful
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -23,7 +22,6 @@ export function formatCurrency(value: number | string): string {
   }).format(num)
 }
 
-// Generate table row dengan consistent styling - dipakai di preview dan saat kirim email
 function generateTableRow(no: number, invoice: string, nilai: string, diskon: string): string {
   return `<tr>
     <td style="border: 1px solid #e5e7eb; text-align: center;">${no}</td>
@@ -99,10 +97,8 @@ export function getEmailTemplate(): string {
 </div>`
 }
 
-// Export generateTableRow untuk dipakai di file lain
 export { generateTableRow }
 
-// HTML helper untuk tombol "Tabel Invoice" di editor
 export function getInvoiceTableHelperHTML(): string {
   return `<table style="width: 80%; border-collapse: collapse;">
     <colgroup>
@@ -132,14 +128,12 @@ export function getInvoiceTableHelperHTML(): string {
 </table>`
 }
 
-// Config untuk mapping kolom CSV ke table - Single source of truth
 export const COLUMN_MAPPING = {
   invoice: (colName: string) => /invoice/i.test(colName),
   nilai: (colName: string) => /nilai/i.test(colName) && !/diskon/i.test(colName),
   diskon: (colName: string) => /diskon/i.test(colName)
 } as const
 
-// Check apakah required columns exist di column keys
 export function hasInvoiceColumns(columnKeys: string[]): boolean {
   const hasInvoice = columnKeys.some(k => COLUMN_MAPPING.invoice(k))
   const hasNilai = columnKeys.some(k => COLUMN_MAPPING.nilai(k))
@@ -148,7 +142,6 @@ export function hasInvoiceColumns(columnKeys: string[]): boolean {
   return hasInvoice && hasNilai && hasDiskon
 }
 
-// Cari column keys berdasarkan mapping
 export function findColumnKeys(columnKeys: string[]) {
   return {
     invoice: columnKeys.filter(k => COLUMN_MAPPING.invoice(k)),

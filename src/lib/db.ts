@@ -34,7 +34,7 @@ export type Import = {
 export type Row = {
   id: number
   import_id: number
-  data: Record<string, any>  // JSONB stored as object
+  data: Record<string, any>  
   created_at: Date
 }
 

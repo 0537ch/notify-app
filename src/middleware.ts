@@ -1,13 +1,18 @@
-// Auth middleware is handled client-side for localStorage-based auth
-// This file is kept for future cookie-based auth implementation
 import { NextResponse } from 'next/server'
+import { getTokenFromCookie } from '@/lib/token'
+import type { NextRequest } from 'next/server'
 
-export function middleware() {
-  // Allow all requests - auth is handled client-side
+export async function middleware(request: NextRequest) {
+  const token = await getTokenFromCookie()
+
+  if (!token) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: [],
+  matcher: ['/((?!api/auth/login|api/auth/logout|login|_next/static|_next/image|favicon.ico).*)'],
 }
 
