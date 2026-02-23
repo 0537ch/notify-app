@@ -295,7 +295,7 @@ export default function InvoiceTable() {
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10">
+      <div className="relative rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10">
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <Skeleton className="h-10 w-64" />
@@ -307,7 +307,6 @@ export default function InvoiceTable() {
           </div>
         </div>
 
-        {/* Table Skeleton */}
         <div className='overflow-x-auto border-t'>
           <Table>
             <TableHeader>
@@ -343,6 +342,13 @@ export default function InvoiceTable() {
               <Skeleton className="h-8 w-8" />
               <Skeleton className="h-8 w-8" />
             </div>
+          </div>
+        </div>
+
+        <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-sm rounded-xl">
+          <div className="flex flex-col items-center gap-3">
+            <Spinner className="h-12 w-12 text-primary" />
+            <p className="text-sm font-medium text-foreground">Loading data...</p>
           </div>
         </div>
       </div>
