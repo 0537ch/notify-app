@@ -19,7 +19,7 @@ import {
   ComboboxItem,
   ComboboxEmpty,
 } from '@/components/ui/combobox'
-import { FileText, Calendar, Upload, Trash2, Send, FileSpreadsheet, Inbox, ChevronDownIcon, ChevronUpIcon, Columns3, Search, RefreshCcw } from 'lucide-react'
+import { FileText, Calendar, Upload, Trash2, Send, FileSpreadsheet, Inbox, ChevronDownIcon, ChevronUpIcon, Columns3, Search, RefreshCcw, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { EmailTemplateModal } from './EmailTemplateModal'
 import { Fragment } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -41,6 +41,7 @@ export default function InvoiceTable() {
   })
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [columnSearchQuery, setColumnSearchQuery] = useState<string>('')
+  const [groupByColumn, setGroupByColumn] = useState<string>('')
 
   const columnKeys = useMemo(() => {
     if (people.length === 0) return []
@@ -48,11 +49,33 @@ export default function InvoiceTable() {
     return Object.keys(firstPersonData)
   }, [people])
 
-  // Set default column visibility: only first 5 CSV columns visible
+  const autoDetectGroupByColumn = useMemo(() => {
+    if (columnKeys.length === 0) return ''
+
+    const sampleData = people[0]?.data || {}
+
+    const customerMasterCol = columnKeys.find(key =>
+      /customer.*master|customer.*id|customer/i.test(key)
+    )
+
+    const emailCol = columnKeys.find(key =>
+      typeof sampleData[key] === 'string' && (sampleData[key] as string).includes('@')
+    )
+
+    return customerMasterCol || emailCol || columnKeys[0]
+  }, [columnKeys, people])
+
+  useEffect(() => {
+    if (autoDetectGroupByColumn && !groupByColumn) {
+      setGroupByColumn(autoDetectGroupByColumn)
+    }
+  }, [autoDetectGroupByColumn, groupByColumn])
+
+  // Set default column visibility: only first n CSV columns visible
   const defaultColumnVisibility = useMemo(() => {
     const visibility: VisibilityState = {}
     columnKeys.forEach((key, index) => {
-      if (index >= 5) {
+      if (index >= 3) {
         visibility[key] = false
       }
     })
@@ -76,34 +99,26 @@ export default function InvoiceTable() {
       ...person.data
     })) as Array<{ id: number; created_at: Date; notification_status?: string; notification_sent_at?: Date; notification_error?: string; [key: string]: any }>
 
-    // Auto-detect email column
-    const emailColumn = columnKeys.find(key =>
-      flat.some(row => {
-        const val = row[key]
-        return typeof val === 'string' && val.includes('@')
-      })
-    )
-
-    if (!emailColumn) return flat
+    if (!groupByColumn || !columnKeys.includes(groupByColumn)) return flat
 
     const groups = new Map<string, any>()
     flat.forEach(row => {
-      const email = row[emailColumn] as string
-      if (!groups.has(email)) {
-        groups.set(email, { ...row, _childRows: [] })
+      const groupValue = String(row[groupByColumn] || '')
+      if (!groups.has(groupValue)) {
+        groups.set(groupValue, { ...row, _childRows: [] })
       }
-      groups.get(email)!._childRows.push(row)
+      groups.get(groupValue)!._childRows.push(row)
     })
 
     return Array.from(groups.values())
-  }, [people, columnKeys])
+  }, [people, columnKeys, groupByColumn])
 
   const selectedFlattenedData = useMemo(() => {
     const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key])
     return selectedIndices.map(idx => flattenedData[parseInt(idx)])
   }, [rowSelection, flattenedData])
 
-  const emailTemplate = useEmailTemplate(selectedFlattenedData, columnKeys)
+  const emailTemplate = useEmailTemplate(selectedFlattenedData, columnKeys, groupByColumn)
   const { templateModalOpen, setTemplateModalOpen, sending: sendingEmails, sendEmails } = emailTemplate
 
   const sampleData = useMemo(() => {
@@ -132,6 +147,34 @@ export default function InvoiceTable() {
 
     return firstSelectedRow._childRows
   }, [rowSelection, flattenedData])
+
+  const recipients = useMemo(() => {
+    const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key])
+
+    if (selectedIndices.length === 0) return []
+
+    return selectedIndices.map(idx => {
+      const rowIndex = parseInt(idx)
+      const row = flattenedData[rowIndex]
+
+      if (!row) return null
+
+      const { _childRows, id, created_at, notification_status, notification_sent_at, notification_error, ...rowData } = row
+
+      // Find email column
+      const emailColumn = columnKeys.find(key =>
+        typeof rowData[key] === 'string' && (rowData[key] as string).includes('@')
+      )
+
+      return {
+        groupKey: String(rowData[groupByColumn] || `Group ${rowIndex + 1}`),
+        email: emailColumn ? String(rowData[emailColumn]) : '',
+        sampleData: rowData,
+        sampleRows: _childRows || [],
+        invoiceCount: _childRows?.length || 0
+      }
+    }).filter((r): r is NonNullable<typeof r> => r !== null)
+  }, [rowSelection, flattenedData, columnKeys, groupByColumn])
 
   const columns = useMemo<ColumnDef<typeof flattenedData[number]>[]>(() => {
     const cols: ColumnDef<Row>[] = [
@@ -189,26 +232,27 @@ export default function InvoiceTable() {
       },
       {
         id: 'notification_status',
-        size: 120,
+        size: 60,
         enableHiding: false,
-        header: 'Status',
+        header: '',
         cell: ({ row }) => {
           const childRows = (row.original as any)._childRows || []
           const firstChild = childRows[0] || row.original
           const status = firstChild.notification_status || 'not_yet'
 
           const statusConfig = {
-            not_yet: { label: 'Not Yet', variant: 'secondary' as const, className: '' },
-            success: { label: 'Success', variant: 'default' as const, className: 'bg-green-500 hover:bg-green-600 text-white' },
-            failed: { label: 'Failed', variant: 'destructive' as const, className: '' }
+            not_yet: { icon: Clock, className: 'text-muted-foreground', label: 'Not Yet' },
+            success: { icon: CheckCircle2, className: 'text-green-600', label: 'Success' },
+            failed: { icon: XCircle, className: 'text-destructive', label: 'Failed' }
           }
 
           const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.not_yet
+          const Icon = config.icon
 
           return (
-            <Badge variant={config.variant} className={config.className}>
-              {config.label}
-            </Badge>
+            <div className='flex items-center justify-center' title={config.label}>
+              <Icon className={`h-5 w-5 ${config.className}`} />
+            </div>
           )
         }
       }
@@ -314,7 +358,7 @@ export default function InvoiceTable() {
   }
 
   return (
-    <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10">
+    <div className="rounded-xl border border-white/20 bg-white/85 backdrop-blur-xl text-card-foreground shadow-xl shadow-black/5 dark:bg-gray-900/85 dark:border-white/10 overflow-hidden">
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
@@ -356,14 +400,15 @@ export default function InvoiceTable() {
           </div>
           <div className="flex items-center gap-3">
             {columnKeys.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Columns3 className="h-4 w-4" />
-                    Kolom
-                    <ChevronDownIcon className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Columns3 className="h-4 w-4" />
+                      Kolom
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -411,6 +456,31 @@ export default function InvoiceTable() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <Combobox value={groupByColumn} onValueChange={(value) => setGroupByColumn(value || '')}>
+                <ComboboxInput
+                  placeholder="Group By..."
+                  showTrigger
+                  className="w-40"
+                  value={groupByColumn}
+                  readOnly
+                />
+                <ComboboxContent>
+                  <ComboboxList>
+                    {columnKeys.map((key) => (
+                      <ComboboxItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10">
+                            <Inbox className="h-3 w-3 text-primary" />
+                          </div>
+                          <span className="text-sm">{key}</span>
+                        </div>
+                      </ComboboxItem>
+                    ))}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </>
             )}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileSpreadsheet className="h-4 w-4" />
@@ -434,6 +504,7 @@ export default function InvoiceTable() {
             variables={columnKeys}
             sampleData={sampleData}
             sampleRows={sampleRows}
+            recipients={recipients}
             onSend={sendEmails}
             sending={sendingEmails}
           />
@@ -551,30 +622,32 @@ export default function InvoiceTable() {
                       {row.getIsExpanded() && (
                         <TableRow className='hover:bg-transparent animate-in fade-in slide-in-from-top-2 duration-300'>
                           <TableCell></TableCell>
-                          <TableCell colSpan={columnKeys.length + 1} className='p-4'>
-                            <div className='rounded-lg border overflow-hidden'>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow className='bg-slate-100 border-b-2 border-slate-300'>
-                                    {columnKeys.map(key => (
-                                      <TableHead key={key} className='text-xs font-semibold text-foreground'>
-                                        {key}
-                                      </TableHead>
-                                    ))}
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
-                                    <TableRow key={idx} className='bg-white hover:bg-slate-50'>
+                          <TableCell colSpan={columnKeys.length + 1} className='p-4' style={{ width: '1px', minWidth: '0' }}>
+                            <div className='rounded-lg border overflow-hidden' style={{ width: '100%', overflow: 'hidden' }}>
+                              <div className='overflow-x-auto'>
+                                <Table style={{ minWidth: 'max-content' }}>
+                                  <TableHeader>
+                                    <TableRow className='bg-slate-100 border-b-2 border-slate-300'>
                                       {columnKeys.map(key => (
-                                        <TableCell key={key} className='text-sm'>
-                                          {childRow[key] ?? ''}
-                                        </TableCell>
+                                        <TableHead key={key} className='text-xs font-semibold text-foreground whitespace-nowrap'>
+                                          {key}
+                                        </TableHead>
                                       ))}
                                     </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
+                                      <TableRow key={idx} className='bg-white hover:bg-slate-50'>
+                                        {columnKeys.map(key => (
+                                          <TableCell key={key} className='text-sm whitespace-nowrap'>
+                                            {childRow[key] ?? ''}
+                                          </TableCell>
+                                        ))}
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>

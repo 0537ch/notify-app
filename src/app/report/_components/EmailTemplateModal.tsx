@@ -7,12 +7,21 @@ import { EmailTemplateEditor } from '@/components/email-template-editor'
 import { Spinner } from '@/components/ui/spinner'
 import { X } from 'lucide-react'
 
+interface RecipientData {
+  groupKey: string
+  email: string
+  sampleData: Record<string, any>
+  sampleRows: any[]
+  invoiceCount: number
+}
+
 interface EmailTemplateModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   variables: string[]
   sampleData?: Record<string, any>
   sampleRows?: any[]
+  recipients?: RecipientData[]
   onSend: (template: string, subject: string, ccEmails?: string) => Promise<void>
   sending?: boolean
   defaultSubject?: string
@@ -24,6 +33,7 @@ export function EmailTemplateModal({
   variables,
   sampleData,
   sampleRows,
+  recipients = [],
   onSend,
   sending = false,
   defaultSubject = 'PT Terminal Petikemas Surabaya'
@@ -90,6 +100,7 @@ export function EmailTemplateModal({
             variables={variables}
             sampleData={sampleData}
             sampleRows={sampleRows}
+            recipients={recipients}
             onSave={setTemplate}
             subject={subject}
             onSubjectChange={setSubject}

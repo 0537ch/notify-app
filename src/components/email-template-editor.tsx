@@ -1,10 +1,18 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import { getEmailTemplate, generateTableRow, getInvoiceTableHelperHTML, findColumnKeys, hasInvoiceColumns, formatCurrency } from '@/lib/email-template'
+import { getEmailTemplate, getInvoiceTableHelperHTML, findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate } from '@/lib/email-template'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {  Table, List, Type, Image } from 'lucide-react'
+
+interface RecipientData {
+  groupKey: string
+  email: string
+  sampleData: Record<string, any>
+  sampleRows: any[]
+  invoiceCount: number
+}
 
 interface EmailTemplateEditorProps {
   variables: string[]
@@ -12,16 +20,23 @@ interface EmailTemplateEditorProps {
   defaultTemplate?: string
   sampleData?: Record<string, any>
   sampleRows?: any[]
+  recipients?: RecipientData[]
   subject?: string
   onSubjectChange?: (subject: string) => void
   ccEmails?: string
   onCcEmailsChange?: (emails: string) => void
 }
 
-export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sampleData, sampleRows = [], subject = '', onSubjectChange, ccEmails = '', onCcEmailsChange }: EmailTemplateEditorProps) {
+export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sampleData, sampleRows = [], recipients = [], subject = '', onSubjectChange, ccEmails = '', onCcEmailsChange }: EmailTemplateEditorProps) {
   const [template, setTemplate] = useState(defaultTemplate || getDefaultTemplate())
   const [showHelpers, setShowHelpers] = useState(true)
+  const [selectedRecipientIndex, setSelectedRecipientIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Determine if we're using multi-recipient mode or legacy mode
+  const isMultiRecipient = recipients.length > 0
+  const currentSampleData = isMultiRecipient ? recipients[selectedRecipientIndex]?.sampleData : sampleData
+  const currentSampleRows = isMultiRecipient ? recipients[selectedRecipientIndex]?.sampleRows : sampleRows
 
   const preview = useMemo(() => {
     let result = template
@@ -39,46 +54,46 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
       const value = findValue(row, possibleKeys)
       if (typeof value === 'number') return value
       if (typeof value === 'string') {
-        return parseFloat(value.replace(/[Rp.\s]/g, '')) || 0
+        return parseFloat(value.replace(/[^\d]/g, '')) || 0
       }
       return 0
     }
 
-    if (sampleRows.length > 0 && hasInvoiceColumns(variables)) {
-      const columnKeys = findColumnKeys(variables)
+    let tbodyTemplate: ReturnType<typeof extractTBodyTemplate> = null
 
-      const tableRows = sampleRows.map((row, idx) => {
-        const invoice = findValue(row, columnKeys.invoice)
-        const nilai = findValue(row, columnKeys.nilai)
-        const diskon = findValue(row, columnKeys.diskon)
+    if (currentSampleRows.length > 0) {
+      tbodyTemplate = extractTBodyTemplate(template)
 
-        return generateTableRow(idx + 1, invoice, formatCurrency(String(nilai)), formatCurrency(String(diskon)))
-      }).join('')
+      if (tbodyTemplate && tbodyTemplate.cells.length > 0) {
+        const tableRows = currentSampleRows.map((row, idx) => {
+          return generateTableRowFromTemplate(row, tbodyTemplate!, idx + 1)
+        }).join('')
 
-      const totalNilai = sampleRows.reduce((sum: number, row: any) => {
-        return sum + findNumericValue(row, columnKeys.nilai)
-      }, 0)
-
-      const totalDiskon = sampleRows.reduce((sum: number, row: any) => {
-        return sum + findNumericValue(row, columnKeys.diskon)
-      }, 0)
-
-      const tbodyMatch = result.match(/<tbody>([\s\S]*?)<\/tbody>/)
-      if (tbodyMatch && tbodyMatch[1].trim() !== '' && (tbodyMatch[1].includes('{{') || tbodyMatch[1].includes('<td'))) {
         result = result.replace(/<tbody>[\s\S]*?<\/tbody>/, `<tbody>${tableRows}</tbody>`)
-      }
 
-      result = result.replace(/{{TotalNilai}}/g, formatCurrency(totalNilai))
-      result = result.replace(/{{TotalDiskon}}/g, formatCurrency(totalDiskon))
+        if (hasInvoiceColumns(variables)) {
+          const columnKeys = findColumnKeys(variables)
+          const totalNilai = currentSampleRows.reduce((sum: number, row: any) => {
+            return sum + findNumericValue(row, columnKeys.nilai)
+          }, 0)
+
+          const totalDiskon = currentSampleRows.reduce((sum: number, row: any) => {
+            return sum + findNumericValue(row, columnKeys.diskon)
+          }, 0)
+
+          result = result.replace(/{{TotalNilai}}/g, formatCurrency(totalNilai))
+          result = result.replace(/{{TotalDiskon}}/g, formatCurrency(totalDiskon))
+        }
+      }
     }
 
     variables.forEach(variable => {
-      const value = sampleData?.[variable] || getPlaceholder(variable)
+      const value = currentSampleData?.[variable] || getPlaceholder(variable)
       result = result.replace(new RegExp(`{{${variable}}}`, 'g'), String(value))
     })
 
     return result
-  }, [template, variables, sampleData, sampleRows])
+  }, [template, variables, currentSampleData, currentSampleRows, selectedRecipientIndex])
 
   function insertAtCursor(text: string) {
     const textarea = textareaRef.current
@@ -275,11 +290,54 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Preview</CardTitle>
-          <CardDescription>
-            Preview email dengan sample data
-          </CardDescription>
         </CardHeader>
-        <CardContent className="flex-1">
+        <CardContent className="flex-1 space-y-4">
+          {/* Recipient Summary */}
+          {isMultiRecipient && (
+            <div className="p-4 bg-muted/50 rounded-lg border">
+              <p className="text-sm font-medium mb-2">
+                ✅ Email akan dikirim ke {recipients.length} penerima:
+              </p>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                {recipients.map((r, idx) => (
+                  <li
+                    key={idx}
+                    className={idx === selectedRecipientIndex ? 'text-foreground font-medium' : ''}
+                  >
+                    • {r.groupKey} ({r.invoiceCount} {r.invoiceCount === 1 ? 'invoice' : 'invoices'})
+                    {r.email && <span className="text-xs ml-2">({r.email})</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Recipient Selector Dropdown */}
+          {isMultiRecipient && recipients.length > 1 && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                Pilih Recipient untuk Preview:
+              </label>
+              <select
+                value={selectedRecipientIndex}
+                onChange={(e) => setSelectedRecipientIndex(parseInt(e.target.value))}
+                className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                {recipients.map((r, idx) => (
+                  <option key={idx} value={idx}>
+                    {r.groupKey} {r.invoiceCount > 0 ? `(${r.invoiceCount} invoices)` : ''}
+                  </option>
+                ))}
+              </select>
+              {recipients[selectedRecipientIndex]?.email && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email: {recipients[selectedRecipientIndex].email}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Email Preview */}
           <div
             className="border rounded-lg p-8 prose prose-sm max-w-none overflow-auto bg-white"
             dangerouslySetInnerHTML={{ __html: preview }}

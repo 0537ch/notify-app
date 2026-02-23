@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       const workbook = XLSX.read(buffer)
       const sheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[sheetName]
-      const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number | null | undefined)[][]
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as (string | number | null | undefined)[][]
 
       if (data.length > 0) {
         const headers = data[0].map(h => String(h).trim())
@@ -59,6 +59,14 @@ export async function POST(request: Request) {
       )
     }
 
+    const cleanedData = parsedData.map(row => {
+      const cleanedRow: Record<string, any> = {}
+      for (const [key, value] of Object.entries(row)) {
+        cleanedRow[key] = convertScientificNotation(value)
+      }
+      return cleanedRow
+    })
+
     await sql`UPDATE imports SET is_active = false`
 
     const [importRecord] = await sql<{ id: number }[]>`
@@ -67,7 +75,7 @@ export async function POST(request: Request) {
       RETURNING id
     `
 
-    for (const rowData of parsedData) {
+    for (const rowData of cleanedData) {
       await sql`
         INSERT INTO rows (import_id, data)
         VALUES (${importRecord.id}, ${sql.json(rowData)})
@@ -130,4 +138,29 @@ function parseCSVLine(line: string): string[] {
 
   values.push(current)
   return values
+}
+
+function convertScientificNotation(value: any): any {
+  if (value === null || value === undefined) {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return String(value)
+  }
+
+  if (typeof value === 'string') {
+    const lowerValue = value.toLowerCase().trim()
+
+    if (/e\+?\d+$/i.test(lowerValue)) {
+      const num = parseFloat(lowerValue)
+      if (!isNaN(num)) {
+        return String(num)
+      }
+    }
+
+    return value
+  }
+
+  return value
 }

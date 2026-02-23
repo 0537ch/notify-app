@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { generateTableRow, findColumnKeys, hasInvoiceColumns, formatCurrency } from '@/lib/email-template'
+import { findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate } from '@/lib/email-template'
 
 const MAX_ROWS_PER_SEND = 1000
 const MAX_EMAILS_PER_BATCH = 100
@@ -22,10 +22,10 @@ interface EmailData {
   message: string
 }
 
-export function useEmailTemplate(people: Array<any>, columnKeys: string[]) {
+export function useEmailTemplate(people: Array<any>, columnKeys: string[], groupByColumn: string) {
   const [sending, setSending] = useState(false)
   const [templateModalOpen, setTemplateModalOpen] = useState(false)
-  const [hasSent, setHasSent] = useState(false) 
+  const [hasSent, setHasSent] = useState(false)
 
   const groupedByEmail = useMemo(() => {
     const groups = new Map<string, any[]>()
@@ -48,6 +48,10 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[]) {
       return groups
     }
 
+    if (!groupByColumn) {
+      console.error('❌ No group by column specified')
+      return groups
+    }
 
     people.forEach(person => {
       if (person._childRows && person._childRows.length > 0) {
@@ -89,7 +93,7 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[]) {
     })
 
     return groups
-  }, [people, columnKeys])
+  }, [people, columnKeys, groupByColumn])
 
   async function sendEmails(template: string, subjectTemplate: string, ccEmailsString?: string) {
     if (!template || template.trim() === '') {
@@ -157,7 +161,7 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[]) {
             const totalNilai = rows.reduce((sum: number, row: any) => {
               let nilai = 0
               for (const key of keys.nilai) {
-                const val = parseFloat(String(row[key] || 0).replace(/[Rp.\s]/g, '')) || 0
+                const val = parseFloat(String(row[key] || 0).replace(/[^\d]/g, '')) || 0
                 nilai += val
               }
               return sum + nilai
@@ -166,37 +170,36 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[]) {
             const totalDiskon = rows.reduce((sum: number, row: any) => {
               let diskon = 0
               for (const key of keys.diskon) {
-                const val = parseFloat(String(row[key] || 0).replace(/[Rp.\s]/g, '')) || 0
+                const val = parseFloat(String(row[key] || 0).replace(/[^\d]/g, '')) || 0
                 diskon += val
               }
               return sum + diskon
             }, 0)
 
+            // Round to avoid floating point issues
+            const roundedTotalNilai = Math.round(totalNilai)
+            const roundedTotalDiskon = Math.round(totalDiskon)
+
             emailContent = emailContent
-              .replace(/{{TotalNilai}}/g, escapeHtml(formatCurrency(totalNilai)))
-              .replace(/{{TotalDiskon}}/g, escapeHtml(formatCurrency(totalDiskon)))
+              .replace(/{{TotalNilai}}/g, escapeHtml(formatCurrency(roundedTotalNilai)))
+              .replace(/{{TotalDiskon}}/g, escapeHtml(formatCurrency(roundedTotalDiskon)))
 
-            const tableRows = rows.map((row: any, idx: number) => {
-              const invoice = keys.invoice.map(k => row[k]).find(v => v) || ''
-              const nilai = keys.nilai.map(k => row[k]).find(v => v) || ''
-              const diskon = keys.diskon.map(k => row[k]).find(v => v) || ''
+            const tbodyTemplate = extractTBodyTemplate(template)
 
-              return generateTableRow(
-                idx + 1,
-                escapeHtml(String(invoice)),
-                formatCurrency(String(nilai)),
-                formatCurrency(String(diskon))
+            if (tbodyTemplate && tbodyTemplate.cells.length > 0) {
+              const tableRows = rows.map((row: any, idx: number) => {
+                return generateTableRowFromTemplate(row, tbodyTemplate, idx + 1)
+              }).join('')
+
+              emailContent = emailContent.replace(
+                /<tbody>[\s\S]*?<\/tbody>/,
+                `<tbody>${tableRows}</tbody>`
               )
-            }).join('')
-
-            emailContent = emailContent.replace(
-              /<tbody>[\s\S]*?<\/tbody>/,
-              `<tbody>${tableRows}</tbody>`
-            )
+            }
           }
 
           columnKeys.forEach(key => {
-            if (/invoice|nilai|diskon|total/i.test(key)) return
+            if (/job.?order|invoice|nilai|diskon|total/i.test(key)) return
 
             const value = firstRow[key] || ''
             const safeValue = escapeHtml(String(value))

@@ -19,7 +19,7 @@ export default function InvoicePage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-400/10 rounded-full blur-3xl" />
       </div>
       <AppSidebar />
-      <SidebarInset className="bg-transparent">
+      <SidebarInset className="bg-transparent overflow-x-hidden">
         {/* Mobile Header */}
         <header className="flex h-16 shrink-0 items-center gap-2 border-b border-white/20 px-4 md:hidden bg-white/80 backdrop-blur-md sticky top-0 z-10 dark:bg-gray-900/80 dark:border-white/10">
           <SidebarTrigger className="-ml-1" />
@@ -33,7 +33,7 @@ export default function InvoicePage() {
         </header>
 
         {/* Main Content Area */}
-        <div className="flex flex-1 flex-col gap-4 sm:p-8 pt-6 relative">
+        <div className="flex flex-1 flex-col gap-4 sm:p-8 pt-6 relative overflow-x-hidden">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
