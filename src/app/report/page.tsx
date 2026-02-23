@@ -8,23 +8,6 @@ import { Input } from '@/components/ui/input'
 import { AuthProvider } from '@/components/auth-provider'
 
 export default function InvoicePage() {
-  const [totalCount, setTotalCount] = useState<number>(0)
-  const [searchQuery, setSearchQuery] = useState('')
-
-  useEffect(() => {
-    async function fetchTotal() {
-      try {
-        const response = await fetch('/api/people')
-        if (response.ok) {
-          const data = await response.json()
-          setTotalCount(data.people?.length || 0)
-        }
-      } catch (error) {
-        console.error('Failed to fetch total:', error)
-      }
-    }
-    fetchTotal()
-  }, [])
 
   return (
     <AuthProvider>

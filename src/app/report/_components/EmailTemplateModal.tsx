@@ -26,13 +26,12 @@ export function EmailTemplateModal({
   sampleRows,
   onSend,
   sending = false,
-  defaultSubject = 'Notifikasi Keringanan Biaya Layanan - PT Terminal Petikemas Surabaya'
+  defaultSubject = 'PT Terminal Petikemas Surabaya'
 }: EmailTemplateModalProps) {
   const [template, setTemplate] = useState<string>('')
   const [subject, setSubject] = useState<string>(defaultSubject)
   const [ccEmails, setCcEmails] = useState<string>('')
 
-  // Close on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open && !sending) {
@@ -44,7 +43,6 @@ export function EmailTemplateModal({
     return () => document.removeEventListener('keydown', handleEscape)
   }, [open, sending, onOpenChange])
 
-  // Prevent body scroll when open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -64,7 +62,7 @@ export function EmailTemplateModal({
   if (!open) return null
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"

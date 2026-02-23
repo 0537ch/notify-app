@@ -4,8 +4,7 @@ import { useState, useMemo, useRef } from 'react'
 import { getEmailTemplate, generateTableRow, getInvoiceTableHelperHTML, findColumnKeys, hasInvoiceColumns, formatCurrency } from '@/lib/email-template'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Table, List, Type, Image } from 'lucide-react'
+import {  Table, List, Type, Image } from 'lucide-react'
 
 interface EmailTemplateEditorProps {
   variables: string[]
@@ -24,11 +23,9 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
   const [showHelpers, setShowHelpers] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Generate preview with sample data
   const preview = useMemo(() => {
     let result = template
 
-    // Helper to find column value dynamically
     const findValue = (row: any, possibleKeys: string[]) => {
       for (const key of possibleKeys) {
         if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
@@ -38,7 +35,6 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
       return ''
     }
 
-    // Helper to find numeric value
     const findNumericValue = (row: any, possibleKeys: string[]) => {
       const value = findValue(row, possibleKeys)
       if (typeof value === 'number') return value
@@ -48,9 +44,7 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
       return 0
     }
 
-    // Generate table rows if sampleRows are available
     if (sampleRows.length > 0 && hasInvoiceColumns(variables)) {
-      // Find columns using single source of truth
       const columnKeys = findColumnKeys(variables)
 
       const tableRows = sampleRows.map((row, idx) => {
@@ -61,7 +55,6 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
         return generateTableRow(idx + 1, invoice, formatCurrency(String(nilai)), formatCurrency(String(diskon)))
       }).join('')
 
-      // Calculate totals
       const totalNilai = sampleRows.reduce((sum: number, row: any) => {
         return sum + findNumericValue(row, columnKeys.nilai)
       }, 0)
@@ -70,18 +63,15 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
         return sum + findNumericValue(row, columnKeys.diskon)
       }, 0)
 
-      // Only replace tbody if it contains variables (not empty)
       const tbodyMatch = result.match(/<tbody>([\s\S]*?)<\/tbody>/)
       if (tbodyMatch && tbodyMatch[1].trim() !== '' && (tbodyMatch[1].includes('{{') || tbodyMatch[1].includes('<td'))) {
         result = result.replace(/<tbody>[\s\S]*?<\/tbody>/, `<tbody>${tableRows}</tbody>`)
       }
 
-      // Replace totals
       result = result.replace(/{{TotalNilai}}/g, formatCurrency(totalNilai))
       result = result.replace(/{{TotalDiskon}}/g, formatCurrency(totalDiskon))
     }
 
-    // Replace all variables with sample data (both inside and outside tables)
     variables.forEach(variable => {
       const value = sampleData?.[variable] || getPlaceholder(variable)
       result = result.replace(new RegExp(`{{${variable}}}`, 'g'), String(value))
@@ -103,7 +93,6 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
 
     setTemplate(newValue)
 
-    // Set cursor position after inserted text
     setTimeout(() => {
       textarea.focus()
       textarea.setSelectionRange(start + text.length, start + text.length)
