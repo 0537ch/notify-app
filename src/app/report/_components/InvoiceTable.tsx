@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { ButtonGroup } from '@/components/ui/button-group'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import {
@@ -266,7 +267,7 @@ export default function InvoiceTable() {
         <div className='overflow-x-auto border-t'>
           <Table>
             <TableHeader>
-              <TableRow className='hover:bg-transparent'>
+              <TableRow className='hover:bg-transparent bg-slate-100 border-b-2 border-slate-300'>
                 <TableHead><Skeleton className="h-4 w-4" /></TableHead>
                 <TableHead><Skeleton className="h-4 w-24" /></TableHead>
                 <TableHead><Skeleton className="h-4 w-32" /></TableHead>
@@ -276,7 +277,7 @@ export default function InvoiceTable() {
             </TableHeader>
             <TableBody>
               {[...Array(5)].map((_, i) => (
-                <TableRow key={i}>
+                <TableRow key={i} className='bg-white'>
                   <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
@@ -419,7 +420,7 @@ export default function InvoiceTable() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button
+          <Button size="sm"
             onClick={() => setTemplateModalOpen(true)}
             disabled={Object.keys(rowSelection).filter(key => rowSelection[key]).length === 0}
           >
@@ -447,14 +448,14 @@ export default function InvoiceTable() {
           />
 
           {!selectedFile ? (
-            <>
-              <Button onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+            <ButtonGroup>
+              <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                 <Upload className="mr-2 h-4 w-4" />
                 Upload File
               </Button>
               <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="destructive" disabled={!selectedImportId}>
+                  <Button variant="destructive" size="sm" disabled={!selectedImportId}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </Button>
@@ -472,6 +473,7 @@ export default function InvoiceTable() {
                     </Button>
                     <Button
                       variant="destructive"
+                      size="sm"
                       onClick={async () => {
                         if (selectedImportId) {
                           setDeleting(true)
@@ -489,19 +491,21 @@ export default function InvoiceTable() {
                   </div>
                 </DialogContent>
               </Dialog>
-            </>
+            </ButtonGroup>
           ) : (
             <>
               <div className="text-sm text-muted-foreground truncate px-3 py-2 bg-muted rounded">
                 {selectedFile.name}
               </div>
-              <Button onClick={handleImport} disabled={uploading}>
-                {uploading && <Spinner className="mr-2" />}
-                {uploading ? 'Importing...' : 'Import'}
-              </Button>
-              <Button variant="outline" onClick={() => setSelectedFile(null)} disabled={uploading}>
-                Cancel
-              </Button>
+              <ButtonGroup>
+                <Button size="sm" onClick={handleImport} disabled={uploading}>
+                  {uploading && <Spinner className="mr-2" />}
+                  {uploading ? 'Importing...' : 'Import'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSelectedFile(null)} disabled={uploading}>
+                  Cancel
+                </Button>
+              </ButtonGroup>
             </>
           )}
         </div>
@@ -521,9 +525,9 @@ export default function InvoiceTable() {
             <Table>
               <TableHeader>
                 {table.getHeaderGroups().map(headerGroup => (
-                  <TableRow key={headerGroup.id} className='hover:bg-transparent bg-muted/50 border-b-2'>
+                  <TableRow key={headerGroup.id} className='hover:bg-transparent bg-slate-100 border-b-2 border-slate-300'>
                     {headerGroup.headers.map(header => (
-                      <TableHead key={header.id} className='font-semibold'>
+                      <TableHead key={header.id} className='font-semibold text-foreground'>
                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}
@@ -534,7 +538,7 @@ export default function InvoiceTable() {
                 {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map(row => (
                     <Fragment key={row.id}>
-                      <TableRow data-state={row.getIsSelected() && 'selected'}>
+                      <TableRow data-state={row.getIsSelected() && 'selected'} className='bg-white hover:bg-white'>
                         {row.getVisibleCells().map(cell => (
                           <TableCell
                             key={cell.id}
@@ -551,9 +555,9 @@ export default function InvoiceTable() {
                             <div className='rounded-lg border overflow-hidden'>
                               <Table>
                                 <TableHeader>
-                                  <TableRow className='bg-muted/50 border-b-2'>
+                                  <TableRow className='bg-slate-100 border-b-2 border-slate-300'>
                                     {columnKeys.map(key => (
-                                      <TableHead key={key} className='text-xs font-semibold text-muted-foreground'>
+                                      <TableHead key={key} className='text-xs font-semibold text-foreground'>
                                         {key}
                                       </TableHead>
                                     ))}
@@ -561,7 +565,7 @@ export default function InvoiceTable() {
                                 </TableHeader>
                                 <TableBody>
                                   {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
-                                    <TableRow key={idx} className='hover:bg-muted/30'>
+                                    <TableRow key={idx} className='bg-white hover:bg-slate-50'>
                                       {columnKeys.map(key => (
                                         <TableCell key={key} className='text-sm'>
                                           {childRow[key] ?? ''}

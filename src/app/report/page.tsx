@@ -55,16 +55,7 @@ export default function InvoicePage() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
                 Report
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Total: {totalCount} orang
-              </p>
-              <Input
-              placeholder='Search'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className='mt-3 max-w-sm bg-white/80 backdrop-blur-sm border-white/30 focus:bg-white/90 dark:bg-gray-900/80 dark:border-white/10 dark:focus:bg-gray-900/90'/>
-            </div>
+              </h1></div>
           </div>
           <InvoiceTable />
         </div>
