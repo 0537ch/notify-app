@@ -603,15 +603,14 @@ export default function InvoiceTable() {
       ) : (
         <>
           <div className='overflow-auto border-t flex-1 min-h-0'>
-            <div className="min-w-full inline-block align-middle">
-              <Table>
-                <TableHeader>
+              <table className="min-w-full caption-bottom text-sm">
+                <thead className="sticky top-0 z-10">
                   {table.getHeaderGroups().map(headerGroup => (
-                    <TableRow key={headerGroup.id} className='sticky top-0 z-10 hover:bg-transparent bg-slate-100/95 backdrop-blur-sm border-b-2 border-slate-300 shadow-sm'>
+                    <tr key={headerGroup.id} className='hover:bg-transparent bg-slate-100/95 backdrop-blur-sm border-b-2 border-slate-300 shadow-sm'>
                       {headerGroup.headers.map(header => (
-                        <TableHead
+                        <th
                           key={header.id}
-                          className='font-semibold text-foreground'
+                          className='text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap font-semibold sticky top-0 z-10 bg-slate-100/95 backdrop-blur-sm'
                           aria-sort={
                             header.column.getIsSorted() === 'asc'
                               ? 'ascending'
@@ -639,70 +638,69 @@ export default function InvoiceTable() {
                               (header.column.getIsSorted() === 'desc' && <ChevronDownIcon className='shrink-0 opacity-60' size={16} aria-hidden='true' />)}
                             </div>
                           )}
-                        </TableHead>
+                        </th>
                       ))}
-                    </TableRow>
+                    </tr>
                   ))}
-                </TableHeader>
-                <TableBody>
+                </thead>
+                <tbody>
                   {table.getRowModel().rows?.length ? (
                     table.getRowModel().rows.map(row => (
                       <Fragment key={row.id}>
-                        <TableRow data-state={row.getIsSelected() && 'selected'} className='bg-white hover:bg-white'>
+                        <tr data-state={row.getIsSelected() && 'selected'} className='bg-white hover:bg-white border-b transition-colors'>
                           {row.getVisibleCells().map(cell => (
-                            <TableCell
+                            <td
                               key={cell.id}
-                              className='[&:has([aria-expanded])]:[&:has([aria-expanded])]:w-px [&:has([aria-expanded])]:[&:has([aria-expanded])]:py-0'
+                              className='p-2 align-middle whitespace-nowrap [&:has([aria-expanded])]:[&:has([aria-expanded])]:w-px [&:has([aria-expanded])]:[&:has([aria-expanded])]:py-0'
                             >
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
+                            </td>
                           ))}
-                        </TableRow>
+                        </tr>
                         {row.getIsExpanded() && (
-                          <TableRow className='hover:bg-transparent animate-in fade-in slide-in-from-top-2 duration-300'>
-                            <TableCell></TableCell>
-                            <TableCell colSpan={columnKeys.length + 1} className='p-4' style={{ width: '1px', minWidth: '0' }}>
+                          <tr className='hover:bg-transparent animate-in fade-in slide-in-from-top-2 duration-300'>
+                            <td></td>
+                            <td colSpan={columnKeys.length + 1} className='p-4' style={{ width: '1px', minWidth: '0' }}>
                               <div className='rounded-lg border overflow-hidden' style={{ width: '100%', overflow: 'hidden' }}>
                                 <div className='overflow-x-auto'>
-                                  <Table style={{ minWidth: 'max-content' }}>
-                                    <TableHeader>
-                                      <TableRow className='bg-slate-100 border-b-2 border-slate-300'>
+                                  <table style={{ minWidth: 'max-content' }} className="min-w-full caption-bottom text-sm">
+                                    <thead>
+                                      <tr className='bg-slate-100 border-b-2 border-slate-300'>
                                         {columnKeys.map(key => (
-                                          <TableHead key={key} className='text-xs font-semibold text-foreground whitespace-nowrap'>
+                                          <th key={key} className='text-xs text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap font-semibold'>
                                             {key}
-                                          </TableHead>
+                                          </th>
                                         ))}
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
                                       {(row.original as any)._childRows?.map((childRow: any, idx: number) => (
-                                        <TableRow key={idx} className='bg-white hover:bg-slate-50'>
+                                        <tr key={idx} className='bg-white hover:bg-slate-50 border-b transition-colors'>
                                           {columnKeys.map(key => (
-                                            <TableCell key={key} className='text-sm whitespace-nowrap'>
+                                            <td key={key} className='p-2 align-middle whitespace-nowrap text-sm'>
                                               {childRow[key] ?? ''}
-                                            </TableCell>
+                                            </td>
                                           ))}
-                                        </TableRow>
+                                        </tr>
                                       ))}
-                                    </TableBody>
-                                  </Table>
+                                    </tbody>
+                                  </table>
                                 </div>
                               </div>
-                            </TableCell>
-                          </TableRow>
+                            </td>
+                          </tr>
                         )}
                       </Fragment>
                     ))
                   ) : (
-                    <TableRow>
-                      <TableCell colSpan={columns.length} className='h-24 text-center'>
+                    <tr>
+                      <td colSpan={columns.length} className='h-24 text-center p-2 align-middle'>
                         No results.
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   )}
-                </TableBody>
-              </Table>
-            </div>
+                </tbody>
+              </table>
           </div>
 
           <div className="border-t px-6 py-4 shrink-0">
