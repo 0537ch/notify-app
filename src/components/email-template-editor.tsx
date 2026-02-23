@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import { getEmailTemplate, getInvoiceTableHelperHTML, findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate } from '@/lib/email-template'
+import { getEmailTemplate, getInvoiceTableHelperHTML, findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable } from '@/lib/email-template'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {  Table, List, Type, Image } from 'lucide-react'
@@ -71,7 +71,7 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
 
         result = result.replace(/<tbody>[\s\S]*?<\/tbody>/, `<tbody>${tableRows}</tbody>`)
 
-        if (hasInvoiceColumns(variables)) {
+        if (hasInvoiceColumns(variables) && tbodyHasVariable(template, /nilai/i) && tbodyHasVariable(template, /diskon/i)) {
           const columnKeys = findColumnKeys(variables)
           const totalNilai = currentSampleRows.reduce((sum: number, row: any) => {
             return sum + findNumericValue(row, columnKeys.nilai)

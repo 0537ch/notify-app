@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate } from '@/lib/email-template'
+import { findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable } from '@/lib/email-template'
 
 const MAX_ROWS_PER_SEND = 1000
 const MAX_EMAILS_PER_BATCH = 100
@@ -154,10 +154,22 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[], group
 
           let emailContent = template
 
-          if (hasInvoiceColumns(columnKeys)) {
+          if (hasInvoiceColumns(columnKeys) && tbodyHasVariable(template, /nilai/i) && tbodyHasVariable(template, /diskon/i)) {
             const keys = findColumnKeys(columnKeys)
 
-            // Calculate totals
+            const tbodyTemplate = extractTBodyTemplate(template)
+
+            if (tbodyTemplate && tbodyTemplate.cells.length > 0) {
+              const tableRows = rows.map((row: any, idx: number) => {
+                return generateTableRowFromTemplate(row, tbodyTemplate, idx + 1)
+              }).join('')
+
+              emailContent = emailContent.replace(
+                /<tbody>[\s\S]*?<\/tbody>/,
+                `<tbody>${tableRows}</tbody>`
+              )
+            }
+
             const totalNilai = rows.reduce((sum: number, row: any) => {
               let nilai = 0
               for (const key of keys.nilai) {
@@ -176,26 +188,12 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[], group
               return sum + diskon
             }, 0)
 
-            // Round to avoid floating point issues
             const roundedTotalNilai = Math.round(totalNilai)
             const roundedTotalDiskon = Math.round(totalDiskon)
 
             emailContent = emailContent
               .replace(/{{TotalNilai}}/g, escapeHtml(formatCurrency(roundedTotalNilai)))
               .replace(/{{TotalDiskon}}/g, escapeHtml(formatCurrency(roundedTotalDiskon)))
-
-            const tbodyTemplate = extractTBodyTemplate(template)
-
-            if (tbodyTemplate && tbodyTemplate.cells.length > 0) {
-              const tableRows = rows.map((row: any, idx: number) => {
-                return generateTableRowFromTemplate(row, tbodyTemplate, idx + 1)
-              }).join('')
-
-              emailContent = emailContent.replace(
-                /<tbody>[\s\S]*?<\/tbody>/,
-                `<tbody>${tableRows}</tbody>`
-              )
-            }
           }
 
           columnKeys.forEach(key => {

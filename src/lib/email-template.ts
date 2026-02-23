@@ -39,14 +39,6 @@ export function getEmailTemplate(): string {
 
   <div style="overflow-x: auto;">
   <table style="width: 100%; min-width: 600px; border-collapse: collapse;">
-    <colgroup>
-      <col style="width: 5%;" />
-      <col style="width: 15%;" />
-      <col style="width: 15%;" />
-      <col style="width: 30%;" />
-      <col style="width: 17.5%;" />
-      <col style="width: 17.5%;" />
-    </colgroup>
     <thead>
       <tr style="background-color: #f3f4f6;">
         <th style="border: 1px solid #e5e7eb; text-align: center;">No</th>
@@ -69,7 +61,10 @@ export function getEmailTemplate(): string {
     </tbody>
     <tfoot>
       <tr style="background-color: #f9fafb; font-weight: bold;">
-        <td colspan="4" style="border: 1px solid #e5e7eb; text-align: right;">Total</td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">Total</td>
+        <td style="border: 1px solid #e5e7eb;"></td>
+        <td style="border: 1px solid #e5e7eb;"></td>
+        <td style="border: 1px solid #e5e7eb;"></td>
         <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalNilai}}</td>
         <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalDiskon}}</td>
       </tr>
@@ -116,14 +111,6 @@ export function getEmailTemplate(): string {
 export function getInvoiceTableHelperHTML(): string {
   return `<div style="overflow-x: auto;">
 <table style="width: 100%; min-width: 600px; border-collapse: collapse;">
-    <colgroup>
-      <col style="width: 5%;" />
-      <col style="width: 15%;" />
-      <col style="width: 15%;" />
-      <col style="width: 30%;" />
-      <col style="width: 17.5%;" />
-      <col style="width: 17.5%;" />
-    </colgroup>
   <thead>
     <tr style="background-color: #f3f4f6;">
       <th style="border: 1px solid #e5e7eb; text-align: center;">No</th>
@@ -146,7 +133,10 @@ export function getInvoiceTableHelperHTML(): string {
   </tbody>
   <tfoot>
     <tr style="background-color: #f9fafb; font-weight: bold;">
-      <td colspan="4" style="border: 1px solid #e5e7eb; text-align: right;">Total</td>
+      <td style="border: 1px solid #e5e7eb; text-align: right;">Total</td>
+      <td style="border: 1px solid #e5e7eb;"></td>
+      <td style="border: 1px solid #e5e7eb;"></td>
+      <td style="border: 1px solid #e5e7eb;"></td>
       <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalNilai}}</td>
       <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalDiskon}}</td>
     </tr>
@@ -273,6 +263,14 @@ export function hasInvoiceColumns(columnKeys: string[]): boolean {
   const hasDiskon = columnKeys.some(k => COLUMN_MAPPING.diskon(k))
 
   return hasInvoice && hasNilai && hasDiskon
+}
+
+export function tbodyHasVariable(template: string, variablePattern: RegExp): boolean {
+  const tbodyMatch = template.match(/<tbody>([\s\S]*?)<\/tbody>/i)
+  if (!tbodyMatch) return false
+
+  const tbodyContent = tbodyMatch[1]
+  return variablePattern.test(tbodyContent)
 }
 
 export function findColumnKeys(columnKeys: string[]) {
