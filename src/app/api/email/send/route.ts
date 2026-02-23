@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getTokenFromCookie } from '@/lib/token'
 
 export async function POST(request: Request) {
   try {
@@ -11,24 +12,17 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get token from Authorization header
-    const authHeader = request.headers.get('authorization')
+    const token = await getTokenFromCookie()
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
       return NextResponse.json(
         { error: 'Unauthorized - No token provided' },
         { status: 401 }
       )
     }
 
-    const token = authHeader.substring(7) // Remove 'Bearer ' prefix
-
     const body = await request.json()
 
-    console.log('📧 Proxying email request to:', emailApiEndpoint)
-    console.log('📧 Request body keys:', Object.keys(body))
-
-    // Proxy ke email API with bearer token
     const response = await fetch(emailApiEndpoint, {
       method: 'POST',
       headers: {
@@ -40,7 +34,6 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      console.error('❌ Email API error:', errorData)
       return NextResponse.json(
         errorData,
         { status: response.status }
@@ -48,11 +41,8 @@ export async function POST(request: Request) {
     }
 
     const responseData = await response.json()
-    console.log('✅ Email sent successfully')
-
     return NextResponse.json(responseData)
   } catch (error) {
-    console.error('❌ Error proxying email request:', error)
     return NextResponse.json(
       { error: 'Failed to send email' },
       { status: 500 }

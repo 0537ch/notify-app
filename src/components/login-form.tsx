@@ -40,23 +40,10 @@ export function LoginForm() {
         throw new Error(data.error || 'Login gagal')
       }
 
-      // Store token in localStorage
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('username', data.username)
-
-      // Set token expiry (default 24 hours if not provided by API)
-      const expiresIn = data.expiresIn || (24 * 60 * 60) // 24 hours in seconds
-      const expiryTime = new Date().getTime() + (expiresIn * 1000)
-      localStorage.setItem('tokenExpiry', expiryTime.toString())
-
-      console.log('📝 Login successful - Token expiry:', new Date(expiryTime).toISOString())
-
       toast.success('Login berhasil')
 
-      // Redirect to home page
       router.push('/')
     } catch (error) {
-      console.error('Login error:', error)
       toast.error(error instanceof Error ? error.message : 'Login gagal')
     } finally {
       setLoading(false)
@@ -64,7 +51,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Login</CardTitle>

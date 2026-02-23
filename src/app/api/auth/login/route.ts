@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { hashPassword } from '@/lib/hash'
+import { setTokenCookie } from '@/lib/token'
 
 export async function POST(request: Request) {
   try {
@@ -57,15 +58,16 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log('✅ Login successful for:', username)
-
-    return NextResponse.json({
-      token: data.token,
-      expiresIn: data.expiresIn,
+    const responseData = NextResponse.json({
+      success: true,
       username: username
     })
+
+    const expiresIn = data.expiresIn || 3600
+    const responseWithCookie = setTokenCookie(responseData, data.token, expiresIn)
+
+    return responseWithCookie
   } catch (error) {
-    console.error('❌ Login error:', error)
     return NextResponse.json(
       { error: 'Login failed' },
       { status: 500 }

@@ -1,15 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
-// Routes that don't require authentication
-const publicRoutes = ['/login', '/api/auth/login']
+const publicRoutes = ['/login', '/api/auth/login', '/api/auth/logout']
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     setIsClient(true)
@@ -18,57 +19,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isClient) return
 
-    console.log('🔒 Auth check - pathname:', pathname)
-    console.log('📦 localStorage keys:', Object.keys(localStorage))
+    const checkAuth = async () => {
+      const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
 
-    // Check if current route is public
-    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
+      if (isPublicRoute) {
+        setIsAuthenticated(true)
+        setIsLoading(false)
+        return
+      }
 
-    if (isPublicRoute) {
-      console.log('✅ Public route, allowing access')
-      setIsAuthenticated(true)
-      return
+      try {
+        const response = await fetch('/api/auth/me')
+
+        if (!response.ok) {
+          router.push('/login')
+          return
+        }
+
+        setIsAuthenticated(true)
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Auth check error:', error)
+        router.push('/login')
+      }
     }
 
-    // Check for token in localStorage
-    const token = localStorage.getItem('token')
-    console.log('📝 Token found:', !!token)
-    console.log('📝 Token value:', token?.substring(0, 20) + '...')
+    checkAuth()
+  }, [pathname, isClient, router])
 
-    if (!token) {
-      // No token found, redirect to login
-      console.log('❌ No token, redirecting to login')
-      window.location.href = '/login'
-      return
-    }
+  if (isLoading && !publicRoutes.some(route => pathname.startsWith(route))) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
-    // Check token expiry
-    const expiryTime = Number(localStorage.getItem('tokenExpiry')) || 0
-    const now = new Date().getTime()
-
-    console.log('⏰ Token expiry:', new Date(expiryTime).toISOString(), 'Now:', new Date(now).toISOString())
-
-    if (now >= expiryTime) {
-      // Token expired, redirect to login
-      console.log('⏰ Token expired, redirecting to login')
-      localStorage.removeItem('token')
-      localStorage.removeItem('username')
-      localStorage.removeItem('tokenExpiry')
-      window.location.href = '/login'
-      return
-    }
-
-    // Token is valid
-    console.log('✅ Token valid, authenticated')
-    setIsAuthenticated(true)
-  }, [pathname, isClient])
-
-  // Don't render children if not authenticated (will redirect)
   if (!isAuthenticated && !publicRoutes.some(route => pathname.startsWith(route))) {
-    console.log('⏳ Not authenticated yet, not rendering')
     return null
   }
 
-  console.log('🎨 Rendering children')
   return <>{children}</>
 }

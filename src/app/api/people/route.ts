@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
+import { getTokenFromCookie } from '@/lib/token'
 
 export async function DELETE(request: Request) {
   try {
+    const token = await getTokenFromCookie()
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No token provided' },
+        { status: 401 }
+      )
+    }
+
     const sql = getDb()
     const { searchParams } = new URL(request.url)
     const importId = searchParams.get('importId')
@@ -34,7 +43,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting import:', error)
     return NextResponse.json(
       { error: 'Failed to delete import' },
       { status: 500 }
@@ -44,6 +52,14 @@ export async function DELETE(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const token = await getTokenFromCookie()
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No token provided' },
+        { status: 401 }
+      )
+    }
+
     const sql = getDb()
     const { searchParams } = new URL(request.url)
     const importId = searchParams.get('importId')
@@ -93,7 +109,6 @@ export async function GET(request: Request) {
       selectedImportId
     })
   } catch (error) {
-    console.error('Error fetching rows:', error)
     return NextResponse.json(
       { error: 'Failed to fetch rows' },
       { status: 500 }

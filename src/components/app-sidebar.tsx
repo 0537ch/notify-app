@@ -32,14 +32,16 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
   const router = useRouter();
 
-  function handleLogout() {
-    // Clear localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('tokenExpiry');
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST'
+      })
 
-    // Redirect to login
-    router.push('/login');
+      router.push('/login')
+    } catch (error) {
+      router.push('/login')
+    }
   }
 
   return (
