@@ -194,12 +194,10 @@ export function extractTableHeaders(template: string): TableHeader[] {
 export function findColumnKeyForHeader(headerText: string, columnKeys: string[]): string | null {
   const normalizedHeader = headerText.toLowerCase().trim()
 
-  console.log('🔍 Finding column key for header:', headerText, 'normalized:', normalizedHeader, 'availableKeys:', columnKeys)
 
   // Try exact match first
   const exactMatch = columnKeys.find(key => key.toLowerCase() === normalizedHeader)
   if (exactMatch) {
-    console.log('✅ Exact match found:', exactMatch)
     return exactMatch
   }
 
@@ -209,38 +207,31 @@ export function findColumnKeyForHeader(headerText: string, columnKeys: string[])
     return normalizedKey.includes(normalizedHeader) || normalizedHeader.includes(normalizedKey)
   })
   if (fuzzyMatch) {
-    console.log('✅ Fuzzy match found:', fuzzyMatch)
     return fuzzyMatch
   }
 
   // Try pattern matching for common variations
   if (/no.?job.?order|job.?order/i.test(normalizedHeader)) {
     const match = columnKeys.find(k => COLUMN_MAPPING.jobOrder(k)) || null
-    console.log('✅ JobOrder pattern match:', match)
     return match
   }
   if (/no.?invoice|^invoice$/i.test(normalizedHeader) && !/to/i.test(normalizedHeader)) {
     const match = columnKeys.find(k => COLUMN_MAPPING.invoice(k)) || null
-    console.log('✅ Invoice pattern match:', match)
     return match
   }
   if (/invoice.?to/i.test(normalizedHeader)) {
     const match = columnKeys.find(k => COLUMN_MAPPING.invoiceTo(k)) || null
-    console.log('✅ InvoiceTo pattern match:', match)
     return match
   }
   if (/nilai/i.test(normalizedHeader) && !/diskon/i.test(normalizedHeader)) {
     const match = columnKeys.find(k => COLUMN_MAPPING.nilai(k)) || null
-    console.log('✅ Nilai pattern match:', match)
     return match
   }
   if (/diskon/i.test(normalizedHeader)) {
     const match = columnKeys.find(k => COLUMN_MAPPING.diskon(k)) || null
-    console.log('✅ Diskon pattern match:', match)
     return match
   }
 
-  console.log('❌ No match found for:', headerText)
   return null
 }
 
@@ -347,7 +338,6 @@ export function generateTableRowFromTemplate(
         const colKey = findColumnKeyForHeader(variable, Object.keys(row))
         const value = colKey ? (row[colKey] ?? '') : ''
 
-        console.log('📝 Cell variable:', variable, 'colKey:', colKey, 'value:', value, 'row keys:', Object.keys(row))
 
         if (typeof value === 'string' && /nilai|diskon|total/i.test(variable)) {
           content = formatCurrency(value)
