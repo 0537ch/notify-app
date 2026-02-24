@@ -1,6 +1,7 @@
-export function formatCurrency(value: number | string): string {
-  if (typeof value === 'string' && value.includes('Rp')) {
-    return value
+export function formatCurrency(value: number | string | null | undefined): string {
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    return '0'
   }
 
   if (typeof value === 'string' && value.includes('Rp')) {
@@ -8,6 +9,10 @@ export function formatCurrency(value: number | string): string {
   }
 
   const num = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) : value
+
+  if (typeof num !== 'number' || isNaN(num)) {
+    return '0'
+  }
 
   if (num === 0) {
     return '0'
@@ -78,15 +83,21 @@ export function getEmailTemplate(): string {
     <strong>Nama Pemegang Rekening:</strong> {{Invoice To}}
   </p>
 
-  <p>Sehubungan dengan hal tersebut, mohon kiranya dapat dilakukan konfirmasi atas kesesuaian data rekening dimaksud agar proses restitusi dapat segera kami tindak lanjuti. Konfirmasi dimaksud agar disampaikan melalui dokumen berikut:</p>
+  <p>Sehubungan dengan hal tersebut, mohon kiranya dapat dilakukan konfirmasi atas kesesuaian data rekening dimaksud agar proses restitusi dapat segera kami tindak lanjuti. Konfirmasi dimaksud agar disampaikan melalui dokumen sebagai berikut:</p>
 
-  <ol>
-    <li>Scan Surat Permohonan pembayaran restitusi dalam bentuk hard copy yang telah ditandatangani dan dibubuhi meterai.</li>
-    <li>Scan Buku Rekening / Rekening Koran</li>
+  <ol type="1">
+    <li>Scan Surat Permohonan pembayaran restitusi dalam bentuk hard copy yang telah ditandatangani dan dibubuhi meterai (format terlampir).</li>
+    <li>Scan Buku Rekening Bank / Rekening Koran</li>
     <li>Scan NPWP Perusahaan</li>
   </ol>
 
-  <p><em>Nb: Semua dokumen berformat PDF</em></p>
+  <p><em>NB: Semua dokumen dalam format PDF</em></p>
+
+  <p>Surat Permohonan restitusi beserta dokumen pendukung tersebut dapat diemail ke : cs@tps.co.id</p>
+
+  <p>Dan untuk hard copy dapat diserahkan kepada Bagian Customer Service di Gedung Customer Service PT Terminal Petikemas Surabaya, Jl Tanjung Mutiara No 1 Surabaya.</p>
+
+  <p>Apabila diperlukan informasi lebih lanjut silakan dapat menghubungi petugas Customer Service (CS) TPS melalui line telepon 031-3202020 atau melalui email cs@tps.co.id</p>
 
   <p>Demikian disampaikan. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.</p>
 
@@ -103,9 +114,10 @@ export function getEmailTemplate(): string {
     Email ini dikirim otomatis oleh sistem TPS.<br/>
     Mohon tidak membalas email ini.
   </p>
+
+
 </div>`
 }
-
 export function getInvoiceTableHelperHTML(): string {
   return `<div style="overflow-x: auto;">
 <table style="width: 100%; min-width: 600px; border-collapse: collapse;">

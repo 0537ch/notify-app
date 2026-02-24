@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { findTotalVariables, calculateTotalFromRows, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable, renderTemplateWithTotals } from '@/lib/email-template'
+import { hasInvoiceColumns, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable, renderTemplateWithTotals } from '@/lib/email-template'
 
 const MAX_ROWS_PER_SEND = 1000
 const MAX_EMAILS_PER_BATCH = 100

@@ -36,7 +36,7 @@ export function EmailTemplateModal({
   recipients = [],
   onSend,
   sending = false,
-  defaultSubject = 'PT Terminal Petikemas Surabaya'
+  defaultSubject = ''
 }: EmailTemplateModalProps) {
   const [template, setTemplate] = useState<string>('')
   const [subject, setSubject] = useState<string>(defaultSubject)

@@ -253,7 +253,7 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
                   value={attachmentInput}
                   onChange={(e) => setAttachmentInput(e.target.value)}
                   onKeyDown={handleAttachmentKeyDown}
-                  placeholder="/home/adminapp/files/form-pengajuan.pdf"
+                  placeholder="/home/adminapp/files/Format Restitusi.docx"
                   className="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 />
                 <Button
