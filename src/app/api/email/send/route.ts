@@ -21,15 +21,30 @@ export async function POST(request: Request) {
       )
     }
 
-    const body = await request.json()
+    // Check if request is multipart/form-data (for file attachments)
+    const contentType = request.headers.get('content-type') || ''
+    const isMultipart = contentType.includes('multipart/form-data')
+
+    let body: RequestInit['body']
+    let headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+    }
+
+    if (isMultipart) {
+      // Forward FormData directly (for file uploads)
+      body = request.body
+      // Don't set Content-Type for FormData, let the browser set it with boundary
+    } else {
+      // Parse JSON (for regular email without attachments)
+      const jsonBody = await request.json()
+      body = JSON.stringify(jsonBody)
+      headers['Content-Type'] = 'application/json'
+    }
 
     const response = await fetch(emailApiEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(body)
+      headers,
+      body
     })
 
     if (!response.ok) {

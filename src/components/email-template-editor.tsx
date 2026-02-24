@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import { getEmailTemplate, getInvoiceTableHelperHTML, findColumnKeys, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable } from '@/lib/email-template'
+import { getEmailTemplate, getInvoiceTableHelperHTML, findTotalVariables, calculateTotalFromRows, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable } from '@/lib/email-template'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {  Table, List, Type, Image } from 'lucide-react'
@@ -25,9 +25,11 @@ interface EmailTemplateEditorProps {
   onSubjectChange?: (subject: string) => void
   ccEmails?: string
   onCcEmailsChange?: (emails: string) => void
+  attachments?: File[]
+  onAttachmentsChange?: (files: File[]) => void
 }
 
-export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sampleData, sampleRows = [], recipients = [], subject = '', onSubjectChange, ccEmails = '', onCcEmailsChange }: EmailTemplateEditorProps) {
+export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sampleData, sampleRows = [], recipients = [], subject = '', onSubjectChange, ccEmails = '', onCcEmailsChange, attachments = [], onAttachmentsChange }: EmailTemplateEditorProps) {
   const [template, setTemplate] = useState(defaultTemplate || getDefaultTemplate())
   const [showHelpers, setShowHelpers] = useState(true)
   const [selectedRecipientIndex, setSelectedRecipientIndex] = useState(0)
@@ -72,14 +74,9 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
         result = result.replace(/<tbody>[\s\S]*?<\/tbody>/, `<tbody>${tableRows}</tbody>`)
 
         if (hasInvoiceColumns(variables) && tbodyHasVariable(template, /nilai/i) && tbodyHasVariable(template, /diskon/i)) {
-          const columnKeys = findColumnKeys(variables)
-          const totalNilai = currentSampleRows.reduce((sum: number, row: any) => {
-            return sum + findNumericValue(row, columnKeys.nilai)
-          }, 0)
-
-          const totalDiskon = currentSampleRows.reduce((sum: number, row: any) => {
-            return sum + findNumericValue(row, columnKeys.diskon)
-          }, 0)
+          const { nilaiVariables, diskonVariables } = findTotalVariables(template)
+          const totalNilai = calculateTotalFromRows(currentSampleRows, nilaiVariables)
+          const totalDiskon = calculateTotalFromRows(currentSampleRows, diskonVariables)
 
           result = result.replace(/{{TotalNilai}}/g, formatCurrency(totalNilai))
           result = result.replace(/{{TotalDiskon}}/g, formatCurrency(totalDiskon))
@@ -228,6 +225,37 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Pisahkan email dengan koma. Email ini akan menerima CC untuk semua email yang dikirim.
+              </p>
+            </div>
+          )}
+
+          {/* Attachments Input */}
+          {onAttachmentsChange && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                Lampiran (optional):
+              </label>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || [])
+                  onAttachmentsChange(files)
+                }}
+                className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              />
+              {attachments.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs font-medium">File yang dipilih:</p>
+                  {attachments.map((file, index) => (
+                    <p key={index} className="text-xs text-muted-foreground">
+                      • {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                    </p>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                File yang dipilih akan dikirim sebagai lampiran untuk semua email.
               </p>
             </div>
           )}

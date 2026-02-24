@@ -145,124 +145,13 @@ export function getInvoiceTableHelperHTML(): string {
 </div>`
 }
 
-export const COLUMN_MAPPING = {
-  jobOrder: (colName: string) => /job.?order/i.test(colName),
-  invoice: (colName: string) => /invoice/i.test(colName) && !/invoice.?to/i.test(colName),
-  invoiceTo: (colName: string) => /invoice.?to/i.test(colName),
-  nilai: (colName: string) => /nilai/i.test(colName) && !/diskon/i.test(colName),
-  diskon: (colName: string) => /diskon/i.test(colName)
-} as const
-
-export interface TableHeader {
-  text: string
-  alignment: 'left' | 'center' | 'right'
-}
-
-export function extractTableHeaders(template: string): TableHeader[] {
-  const theadMatch = template.match(/<thead>([\s\S]*?)<\/thead>/i)
-  if (!theadMatch) return []
-
-  const trMatch = theadMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)
-  if (!trMatch) return []
-
-  const thMatches = trMatch[1].match(/<th[^>]*>([\s\S]*?)<\/th>/gi)
-  if (!thMatches) return []
-
-  return thMatches.map(th => {
-    // Extract text content
-    const textMatch = th.match(/<th[^>]*>([\s\S]*?)<\/th>/i)
-    const text = textMatch ? textMatch[1].trim() : ''
-
-    // Extract alignment
-    const alignMatch = th.match(/text-align:\s*(left|center|right)/i)
-    const alignment = alignMatch ? alignMatch[1].toLowerCase() as 'left' | 'center' | 'right' : 'left'
-
-    return { text, alignment }
-  })
-}
-
-export function findColumnKeyForHeader(headerText: string, columnKeys: string[]): string | null {
-  const normalizedHeader = headerText.toLowerCase().trim()
-
-
-  // Try exact match first
-  const exactMatch = columnKeys.find(key => key.toLowerCase() === normalizedHeader)
-  if (exactMatch) {
-    return exactMatch
-  }
-
-  // Try fuzzy match
-  const fuzzyMatch = columnKeys.find(key => {
-    const normalizedKey = key.toLowerCase()
-    return normalizedKey.includes(normalizedHeader) || normalizedHeader.includes(normalizedKey)
-  })
-  if (fuzzyMatch) {
-    return fuzzyMatch
-  }
-
-  // Try pattern matching for common variations
-  if (/no.?job.?order|job.?order/i.test(normalizedHeader)) {
-    const match = columnKeys.find(k => COLUMN_MAPPING.jobOrder(k)) || null
-    return match
-  }
-  if (/no.?invoice|^invoice$/i.test(normalizedHeader) && !/to/i.test(normalizedHeader)) {
-    const match = columnKeys.find(k => COLUMN_MAPPING.invoice(k)) || null
-    return match
-  }
-  if (/invoice.?to/i.test(normalizedHeader)) {
-    const match = columnKeys.find(k => COLUMN_MAPPING.invoiceTo(k)) || null
-    return match
-  }
-  if (/nilai/i.test(normalizedHeader) && !/diskon/i.test(normalizedHeader)) {
-    const match = columnKeys.find(k => COLUMN_MAPPING.nilai(k)) || null
-    return match
-  }
-  if (/diskon/i.test(normalizedHeader)) {
-    const match = columnKeys.find(k => COLUMN_MAPPING.diskon(k)) || null
-    return match
-  }
-
-  return null
-}
-
-export function generateDynamicTableRow(
-  no: number,
-  row: Record<string, any>,
-  headers: TableHeader[],
-  columnKeys: string[]
-): string {
-  const cells = headers.map((header) => {
-    let cellContent: string
-
-    if (/^\s*no\.?\s*$/i.test(header.text.trim())) {
-      cellContent = String(no)
-    } else {
-      // Find corresponding CSV column
-      const colKey = findColumnKeyForHeader(header.text, columnKeys)
-      const value = colKey ? (row[colKey] ?? '') : ''
-
-      // Format currency for numeric values
-      if (typeof value === 'string' && /nilai|diskon|total/i.test(header.text)) {
-        cellContent = formatCurrency(value)
-      } else {
-        cellContent = String(value)
-      }
-    }
-
-    return `<td style="border: 1px solid #e5e7eb; text-align: ${header.alignment};">${cellContent}</td>`
-  })
-
-  return `<tr>${cells.join('')}</tr>`
+export function extractVariablesFromTemplate(template: string): string[] {
+  const matches = template.match(/\{\{([^}]+)\}\}/g) || []
+  return matches.map(m => m.replace(/\{\{|\}\}/g, '').trim())
 }
 
 export function hasInvoiceColumns(columnKeys: string[]): boolean {
-  const hasJobOrder = columnKeys.some(k => COLUMN_MAPPING.jobOrder(k))
-  const hasInvoice = columnKeys.some(k => COLUMN_MAPPING.invoice(k))
-  const hasInvoiceTo = columnKeys.some(k => COLUMN_MAPPING.invoiceTo(k))
-  const hasNilai = columnKeys.some(k => COLUMN_MAPPING.nilai(k))
-  const hasDiskon = columnKeys.some(k => COLUMN_MAPPING.diskon(k))
-
-  return hasInvoice && hasNilai && hasDiskon
+  return columnKeys.length > 0
 }
 
 export function tbodyHasVariable(template: string, variablePattern: RegExp): boolean {
@@ -273,14 +162,32 @@ export function tbodyHasVariable(template: string, variablePattern: RegExp): boo
   return variablePattern.test(tbodyContent)
 }
 
-export function findColumnKeys(columnKeys: string[]) {
-  return {
-    jobOrder: columnKeys.filter(k => COLUMN_MAPPING.jobOrder(k)),
-    invoice: columnKeys.filter(k => COLUMN_MAPPING.invoice(k)),
-    invoiceTo: columnKeys.filter(k => COLUMN_MAPPING.invoiceTo(k)),
-    nilai: columnKeys.filter(k => COLUMN_MAPPING.nilai(k)),
-    diskon: columnKeys.filter(k => COLUMN_MAPPING.diskon(k))
-  }
+export function findTotalVariables(template: string): {
+  nilaiVariables: string[]
+  diskonVariables: string[]
+} {
+  const allVariables = extractVariablesFromTemplate(template)
+  const nilaiVariables = allVariables.filter(v => /nilai/i.test(v))
+  const diskonVariables = allVariables.filter(v => /diskon/i.test(v))
+
+  return { nilaiVariables, diskonVariables }
+}
+
+export function calculateTotalFromRows(
+  rows: Record<string, any>[],
+  variables: string[]
+): number {
+  return rows.reduce((sum, row) => {
+    let rowTotal = 0
+    for (const variable of variables) {
+      const value = row[variable]
+      if (value) {
+        const numValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0
+        rowTotal += numValue
+      }
+    }
+    return sum + rowTotal
+  }, 0)
 }
 
 export interface TBodyCell {
@@ -319,6 +226,26 @@ export function extractTBodyTemplate(template: string): {
   return { cells, rawHtml: tbodyContent }
 }
 
+export function renderTemplate(
+  template: string,
+  rowData: Record<string, any>
+): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
+    const trimmedVar = variableName.trim()
+    const value = rowData[trimmedVar]
+
+    if (value === undefined || value === null) {
+      return match
+    }
+
+    if (/nilai|diskon|total/i.test(trimmedVar)) {
+      return formatCurrency(value)
+    }
+
+    return String(value)
+  })
+}
+
 export function generateTableRowFromTemplate(
   row: Record<string, any>,
   tbodyTemplate: { cells: TBodyCell[] },
@@ -330,19 +257,7 @@ export function generateTableRowFromTemplate(
     if (cell.isRowNumber) {
       content = String(rowNo)
     } else {
-      const variableMatch = content.match(/\{\{([^}]+)\}\}/)
-      if (variableMatch) {
-        const variable = variableMatch[1].trim()
-        const colKey = findColumnKeyForHeader(variable, Object.keys(row))
-        const value = colKey ? (row[colKey] ?? '') : ''
-
-
-        if (typeof value === 'string' && /nilai|diskon|total/i.test(variable)) {
-          content = formatCurrency(value)
-        } else {
-          content = String(value)
-        }
-      }
+      content = renderTemplate(content, row)
     }
 
     return `<td style="border: 1px solid #e5e7eb; text-align: ${cell.alignment};">${content}</td>`

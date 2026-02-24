@@ -610,7 +610,7 @@ export default function InvoiceTable() {
                       {headerGroup.headers.map(header => (
                         <th
                           key={header.id}
-                          className='text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap font-semibold sticky top-0 z-10 bg-slate-100/95 backdrop-blur-sm'
+                          className='text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap sticky top-0 z-10 bg-slate-100/95 backdrop-blur-sm'
                           aria-sort={
                             header.column.getIsSorted() === 'asc'
                               ? 'ascending'
@@ -667,7 +667,7 @@ export default function InvoiceTable() {
                                     <thead>
                                       <tr className='bg-slate-100 border-b-2 border-slate-300'>
                                         {columnKeys.map(key => (
-                                          <th key={key} className='text-xs text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap font-semibold'>
+                                          <th key={key} className='text-xs text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap'>
                                             {key}
                                           </th>
                                         ))}
