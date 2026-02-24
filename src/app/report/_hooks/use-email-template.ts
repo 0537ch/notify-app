@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { findTotalVariables, calculateTotalFromRows, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable } from '@/lib/email-template'
+import { findTotalVariables, calculateTotalFromRows, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable, renderTemplateWithTotals } from '@/lib/email-template'
 
 const MAX_ROWS_PER_SEND = 1000
 const MAX_EMAILS_PER_BATCH = 100
@@ -20,7 +20,7 @@ interface EmailData {
   cc?: string[]
   subject: string
   message: string
-  attachments?: File[]
+  attachments?: string[]
 }
 
 export function useEmailTemplate(people: Array<any>, columnKeys: string[], groupByColumn: string) {
@@ -96,7 +96,7 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[], group
     return groups
   }, [people, columnKeys, groupByColumn])
 
-  async function sendEmails(template: string, subjectTemplate: string, ccEmailsString?: string, attachments?: File[]) {
+  async function sendEmails(template: string, subjectTemplate: string, ccEmailsString?: string, attachments?: string[]) {
     if (!template || template.trim() === '') {
       toast.error('Template tidak boleh kosong')
       return
@@ -156,8 +156,6 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[], group
           let emailContent = template
 
           if (hasInvoiceColumns(columnKeys) && tbodyHasVariable(template, /nilai/i) && tbodyHasVariable(template, /diskon/i)) {
-            const { nilaiVariables, diskonVariables } = findTotalVariables(template)
-
             const tbodyTemplate = extractTBodyTemplate(template)
 
             if (tbodyTemplate && tbodyTemplate.cells.length > 0) {
@@ -170,28 +168,10 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[], group
                 `<tbody>${tableRows}</tbody>`
               )
             }
-
-            const totalNilai = calculateTotalFromRows(rows, nilaiVariables)
-            const totalDiskon = calculateTotalFromRows(rows, diskonVariables)
-
-            const roundedTotalNilai = Math.round(totalNilai)
-            const roundedTotalDiskon = Math.round(totalDiskon)
-
-            emailContent = emailContent
-              .replace(/{{TotalNilai}}/g, escapeHtml(formatCurrency(roundedTotalNilai)))
-              .replace(/{{TotalDiskon}}/g, escapeHtml(formatCurrency(roundedTotalDiskon)))
           }
 
-          columnKeys.forEach(key => {
-            if (/job.?order|invoice|nilai|diskon|total/i.test(key)) return
-
-            const value = firstRow[key] || ''
-            const safeValue = escapeHtml(String(value))
-            emailContent = emailContent.replace(
-              new RegExp(`{{${key}}}`, 'g'),
-              safeValue
-            )
-          })
+          // Use renderTemplateWithTotals for all variable replacements (including {total{{variable}}})
+          emailContent = renderTemplateWithTotals(emailContent, rows, columnKeys)
 
           let emailSubject = subjectTemplate
           columnKeys.forEach(key => {
@@ -214,39 +194,12 @@ export function useEmailTemplate(people: Array<any>, columnKeys: string[], group
           }
 
           try {
-            let body: RequestInit['body']
-            let headers: Record<string, string> = {}
-
-            if (attachments && attachments.length > 0) {
-              // Use FormData for file uploads
-              const formData = new FormData()
-              formData.append('sender', emailData.sender)
-              formData.append('to', JSON.stringify(emailData.to))
-              if (emailData.cc) {
-                formData.append('cc', JSON.stringify(emailData.cc))
-              }
-              formData.append('subject', emailData.subject)
-              formData.append('message', emailData.message)
-              attachments.forEach((file, index) => {
-                formData.append(`attachments`, file)
-              })
-              body = formData
-            } else {
-              // Use JSON for emails without attachments
-              headers['Content-Type'] = 'application/json'
-              body = JSON.stringify({
-                sender: emailData.sender,
-                to: emailData.to,
-                cc: emailData.cc,
-                subject: emailData.subject,
-                message: emailData.message
-              })
-            }
-
             const response = await fetch('/api/email/send', {
               method: 'POST',
-              headers,
-              body
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(emailData)
             })
 
             if (!response.ok) {

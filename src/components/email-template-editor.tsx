@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import { getEmailTemplate, getInvoiceTableHelperHTML, findTotalVariables, calculateTotalFromRows, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable } from '@/lib/email-template'
+import { getEmailTemplate, getInvoiceTableHelperHTML, findTotalVariables, calculateTotalFromRows, hasInvoiceColumns, formatCurrency, extractTBodyTemplate, generateTableRowFromTemplate, tbodyHasVariable, renderTemplateWithTotals } from '@/lib/email-template'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {  Table, List, Type, Image } from 'lucide-react'
@@ -25,11 +25,34 @@ interface EmailTemplateEditorProps {
   onSubjectChange?: (subject: string) => void
   ccEmails?: string
   onCcEmailsChange?: (emails: string) => void
-  attachments?: File[]
-  onAttachmentsChange?: (files: File[]) => void
+  attachments?: string[]
+  onAttachmentsChange?: (paths: string[]) => void
 }
 
 export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sampleData, sampleRows = [], recipients = [], subject = '', onSubjectChange, ccEmails = '', onCcEmailsChange, attachments = [], onAttachmentsChange }: EmailTemplateEditorProps) {
+  const [attachmentInput, setAttachmentInput] = useState<string>('')
+
+  function handleAddAttachment() {
+    const trimmedPath = attachmentInput.trim()
+    if (trimmedPath && onAttachmentsChange) {
+      onAttachmentsChange([...attachments, trimmedPath])
+      setAttachmentInput('')
+    }
+  }
+
+  function handleRemoveAttachment(index: number) {
+    if (onAttachmentsChange) {
+      const newAttachments = attachments.filter((_, i) => i !== index)
+      onAttachmentsChange(newAttachments)
+    }
+  }
+
+  function handleAttachmentKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddAttachment()
+    }
+  }
   const [template, setTemplate] = useState(defaultTemplate || getDefaultTemplate())
   const [showHelpers, setShowHelpers] = useState(true)
   const [selectedRecipientIndex, setSelectedRecipientIndex] = useState(0)
@@ -72,22 +95,11 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
         }).join('')
 
         result = result.replace(/<tbody>[\s\S]*?<\/tbody>/, `<tbody>${tableRows}</tbody>`)
-
-        if (hasInvoiceColumns(variables) && tbodyHasVariable(template, /nilai/i) && tbodyHasVariable(template, /diskon/i)) {
-          const { nilaiVariables, diskonVariables } = findTotalVariables(template)
-          const totalNilai = calculateTotalFromRows(currentSampleRows, nilaiVariables)
-          const totalDiskon = calculateTotalFromRows(currentSampleRows, diskonVariables)
-
-          result = result.replace(/{{TotalNilai}}/g, formatCurrency(totalNilai))
-          result = result.replace(/{{TotalDiskon}}/g, formatCurrency(totalDiskon))
-        }
       }
     }
 
-    variables.forEach(variable => {
-      const value = currentSampleData?.[variable] || getPlaceholder(variable)
-      result = result.replace(new RegExp(`{{${variable}}}`, 'g'), String(value))
-    })
+    // Use renderTemplateWithTotals for all variable replacements (including {total{{variable}}})
+    result = renderTemplateWithTotals(result, currentSampleRows, variables)
 
     return result
   }, [template, variables, currentSampleData, currentSampleRows, selectedRecipientIndex])
@@ -235,27 +247,44 @@ export function EmailTemplateEditor({ variables, onSave, defaultTemplate, sample
               <label className="text-sm font-medium mb-2 block">
                 Lampiran (optional):
               </label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || [])
-                  onAttachmentsChange(files)
-                }}
-                className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={attachmentInput}
+                  onChange={(e) => setAttachmentInput(e.target.value)}
+                  onKeyDown={handleAttachmentKeyDown}
+                  placeholder="/home/adminapp/files/form-pengajuan.pdf"
+                  className="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+                <Button
+                  type="button"
+                  onClick={handleAddAttachment}
+                  size="sm"
+                  variant="outline"
+                  className="px-3"
+                >
+                  +
+                </Button>
+              </div>
               {attachments.length > 0 && (
                 <div className="mt-2 space-y-1">
-                  <p className="text-xs font-medium">File yang dipilih:</p>
-                  {attachments.map((file, index) => (
-                    <p key={index} className="text-xs text-muted-foreground">
-                      • {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                    </p>
+                  <p className="text-xs font-medium">Lampiran yang ditambahkan:</p>
+                  {attachments.map((path, index) => (
+                    <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="flex-1">• {path}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                File yang dipilih akan dikirim sebagai lampiran untuk semua email.
+                Masukkan path file dan klik + untuk menambahkan. Lampiran akan dikirim untuk semua email.
               </p>
             </div>
           )}

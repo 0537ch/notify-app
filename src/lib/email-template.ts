@@ -3,13 +3,11 @@ export function formatCurrency(value: number | string): string {
     return value
   }
 
-  let num: number
-  if (typeof value === 'string') {
-    const cleaned = value.replace(/[^\d.-]/g, '')
-    num = parseFloat(cleaned) || 0
-  } else {
-    num = value
+  if (typeof value === 'string' && value.includes('Rp')) {
+    return value
   }
+
+  const num = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) : value
 
   if (num === 0) {
     return '0'
@@ -65,8 +63,8 @@ export function getEmailTemplate(): string {
         <td style="border: 1px solid #e5e7eb;"></td>
         <td style="border: 1px solid #e5e7eb;"></td>
         <td style="border: 1px solid #e5e7eb;"></td>
-        <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalNilai}}</td>
-        <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalDiskon}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">{total{{Nilai Invoice}}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">{total{{Nilai Diskon}}}</td>
       </tr>
     </tfoot>
   </table>
@@ -112,36 +110,37 @@ export function getInvoiceTableHelperHTML(): string {
   return `<div style="overflow-x: auto;">
 <table style="width: 100%; min-width: 600px; border-collapse: collapse;">
   <thead>
-    <tr style="background-color: #f3f4f6;">
-      <th style="border: 1px solid #e5e7eb; text-align: center;">No</th>
-      <th style="border: 1px solid #e5e7eb; text-align: center;">No Job Order</th>
-      <th style="border: 1px solid #e5e7eb; text-align: center;">No Invoice</th>
-      <th style="border: 1px solid #e5e7eb; text-align: center;">Invoice To</th>
-      <th style="border: 1px solid #e5e7eb; text-align: right;">Nilai Invoice</th>
-      <th style="border: 1px solid #e5e7eb; text-align: right;">Nilai Diskon</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="border: 1px solid #e5e7eb; text-align: center;">{{No}}</td>
-      <td style="border: 1px solid #e5e7eb; text-align: center;">{{No Job Order}}</td>
-      <td style="border: 1px solid #e5e7eb; text-align: center;">{{No Invoice}}</td>
-      <td style="border: 1px solid #e5e7eb; text-align: left;">{{Invoice To}}</td>
-      <td style="border: 1px solid #e5e7eb; text-align: right;">{{Nilai Invoice}}</td>
-      <td style="border: 1px solid #e5e7eb; text-align: right;">{{Nilai Diskon}}</td>
-    </tr>
-  </tbody>
-  <tfoot>
-    <tr style="background-color: #f9fafb; font-weight: bold;">
-      <td style="border: 1px solid #e5e7eb; text-align: right;">Total</td>
-      <td style="border: 1px solid #e5e7eb;"></td>
-      <td style="border: 1px solid #e5e7eb;"></td>
-      <td style="border: 1px solid #e5e7eb;"></td>
-      <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalNilai}}</td>
-      <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalDiskon}}</td>
-    </tr>
-  </tfoot>
-</table>
+      <tr style="background-color: #f3f4f6;">
+        
+        <th style="border: 1px solid #e5e7eb; text-align: center;">No</th>
+        <th style="border: 1px solid #e5e7eb; text-align: center;">No Job Order</th>
+        <th style="border: 1px solid #e5e7eb; text-align: center;">No Invoice</th>
+        <th style="border: 1px solid #e5e7eb; text-align: center;">Invoice To</th>
+        <th style="border: 1px solid #e5e7eb; text-align: right;">Nilai Invoice</th>
+        <th style="border: 1px solid #e5e7eb; text-align: right;">Nilai Diskon</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #e5e7eb; text-align: center;">{{No}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: center;">{{No Job Order}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: center;">{{No Invoice}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: left;">{{Invoice To}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">{{Nilai Invoice}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">{{Nilai Diskon}}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="background-color: #f9fafb; font-weight: bold;">
+        <td style="border: 1px solid #e5e7eb; text-align: right;">Total</td>
+        <td style="border: 1px solid #e5e7eb;"></td>
+        <td style="border: 1px solid #e5e7eb;"></td>
+        <td style="border: 1px solid #e5e7eb;"></td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalNilai}}</td>
+        <td style="border: 1px solid #e5e7eb; text-align: right;">{{TotalDiskon}}</td>
+      </tr>
+    </tfoot>
+  </table>
 </div>`
 }
 
@@ -232,7 +231,19 @@ export function renderTemplate(
 ): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
     const trimmedVar = variableName.trim()
-    const value = rowData[trimmedVar]
+    let value = rowData[trimmedVar]
+
+    // Try fuzzy matching if exact match not found
+    if (value === undefined || value === null) {
+      // Remove spaces and special characters for matching
+      const normalizedVar = trimmedVar.replace(/\s+/g, '').toLowerCase()
+      const matchingKey = Object.keys(rowData).find(key =>
+        key.replace(/\s+/g, '').toLowerCase() === normalizedVar
+      )
+      if (matchingKey) {
+        value = rowData[matchingKey]
+      }
+    }
 
     if (value === undefined || value === null) {
       return match
@@ -244,6 +255,72 @@ export function renderTemplate(
 
     return String(value)
   })
+}
+
+export function renderTemplateWithTotals(
+  template: string,
+  rows: Record<string, any>[],
+  columnKeys: string[]
+): string {
+  // First, handle {total{{variableName}}} patterns
+  let result = template.replace(/\{total\{\{([^}]+)\}\}\}/gi, (match, variableName) => {
+    const trimmedVar = variableName.trim()
+    
+    // Find matching column key (with fuzzy matching)
+    const normalizedTarget = trimmedVar.replace(/\s+/g, '').toLowerCase()
+    const matchingKey = columnKeys.find(key =>
+      key.replace(/\s+/g, '').toLowerCase() === normalizedTarget
+    )
+
+    if (matchingKey) {
+      // Calculate total from all rows
+      const total = rows.reduce((sum, row) => {
+        const value = row[matchingKey]
+        if (value) {
+          const numValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0
+          return sum + numValue
+        }
+        return sum
+      }, 0)
+      return formatCurrency(total)
+    }
+
+    return match // Variable not found, return original
+  })
+
+  // Then, handle regular {{variableName}} patterns
+  result = result.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
+    const trimmedVar = variableName.trim()
+
+    // Regular variable replacement (single row)
+    const firstRow = rows[0]
+    if (!firstRow) return match
+
+    let value = firstRow[trimmedVar]
+
+    // Try fuzzy matching if exact match not found
+    if (value === undefined || value === null) {
+      const normalizedVar = trimmedVar.replace(/\s+/g, '').toLowerCase()
+      const matchingKey = columnKeys.find(key =>
+        key.replace(/\s+/g, '').toLowerCase() === normalizedVar
+      )
+      if (matchingKey) {
+        value = firstRow[matchingKey]
+      }
+    }
+
+    if (value === undefined || value === null) {
+      return match
+    }
+
+    if (/nilai|diskon|total/i.test(trimmedVar)) {
+      return formatCurrency(value)
+    }
+
+    return String(value)
+  })
+
+  return result
 }
 
 export function generateTableRowFromTemplate(
@@ -265,4 +342,3 @@ export function generateTableRowFromTemplate(
 
   return `<tr>${cells.join('')}</tr>`
 }
-

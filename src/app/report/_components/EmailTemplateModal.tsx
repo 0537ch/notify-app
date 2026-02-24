@@ -22,7 +22,7 @@ interface EmailTemplateModalProps {
   sampleData?: Record<string, any>
   sampleRows?: any[]
   recipients?: RecipientData[]
-  onSend: (template: string, subject: string, ccEmails?: string, attachments?: File[]) => Promise<void>
+  onSend: (template: string, subject: string, ccEmails?: string, attachments?: string[]) => Promise<void>
   sending?: boolean
   defaultSubject?: string
 }
@@ -41,7 +41,7 @@ export function EmailTemplateModal({
   const [template, setTemplate] = useState<string>('')
   const [subject, setSubject] = useState<string>(defaultSubject)
   const [ccEmails, setCcEmails] = useState<string>('')
-  const [attachments, setAttachments] = useState<File[]>([])
+  const [attachments, setAttachments] = useState<string[]>([])
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
